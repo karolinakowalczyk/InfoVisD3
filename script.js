@@ -1,3 +1,6 @@
+import * as d3 from "https://cdn.skypack.dev/d3@7";
+
+
 const margin = {
     top: 20,
     right: 30,
@@ -8,7 +11,9 @@ const width = 600 - margin.left - margin.right;
 const height = 400 - margin.top - margin.bottom;
 
 function init() {
+    createChordPlot("#vi1");
     createScatterPlot("#vi2");
+    //createCustomizePlot("#vi3");
     drawSlides()
 }
 
@@ -148,6 +153,31 @@ function createScatterPlot(id) {
     });
 }
 
+
+function createChordPlot(id){
+    const svg = d3
+    .select(id)
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("id", "gScatterPlot")
+    .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+    d3.csv("data/disneyland_final_without_missing.csv").then(function (data) {
+    
+
+    const x = d3
+        .scaleLinear()
+        .domain([0, d3.max(data, (d) => parseInt(d.Text_length))])
+        .range([0, width]);
+
+    const y = d3.scaleLinear().domain([-1, 1]).range([height, 0]);
+    });
+}
+
+function createCustomizePlot(id){
+
+}
 
 function drawSlides(){
     function createslider(element) {
