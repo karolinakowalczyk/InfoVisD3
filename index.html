@@ -6,17 +6,18 @@
   <link rel="stylesheet" href="style.css">
   <script src="script.js"></script>
   <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
 </head>
 
 <body onload="init()">
  <div>
   <div class="range-slider" >
     <div class="range-labels">
-      <span class="range-label range-label-start">2010</span>
+      <span class="range-label range-label-start">1990</span>
       <span class="range-label range-label-end">2019</span>
     </div>
-    <input type="range" min="2010" value="2010" max="2018" name="" id="">
-    <input type="range" min="2011" value="2019" max="2019" name="" id="">
+    <input type="range" min="1990" value="1990" max="2018" name="" id="">
+    <input type="range" min="1991" value="2019" max="2019" name="" id="">
 
     <div class="track-wrapper">
       <div class="track"></div>
@@ -26,12 +27,15 @@
     </div>
   </div>
 </div>
-  <div>
-    <div style="width: 50%; float: left"><svg id="vi1"></svg></div>
+  <div style="margin-top: 50px">
+    <div style="width: 50%; float: left"><svg id="vi3"></svg></div>
     <div style="width: 50%; float: left"><svg id="vi2"></svg></div>
   </div>
   <div>
-    <div style="width: 50%; float: left"><svg id="vi3"></svg></div>
+    <!-- <div style="width: 100%; float: left"><svg id="vi3"></svg></div> -->
+  </div>
+  <div>
+    <!-- <div style="width: 50%; float: left"><svg id="vi4"></svg></div> -->
   </div>
 </div>
 </body>
