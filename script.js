@@ -39,8 +39,8 @@ function createScatterPlot(id) {
 
   d3.csv("data/disneyland_final_without_missing.csv").then(function (data) {
     const x = d3
-      .scaleLinear()
-      .domain([0, d3.max(data, (d) => parseInt(d.Text_length))])
+      .scaleLog()
+      .domain([10, d3.max(data, (d) => parseInt(d.Text_length))])
       .range([0, width]);
 
     const y = d3.scaleLinear().domain([-1, 1]).range([height, 0]);
@@ -166,6 +166,23 @@ function createCustomizePlot(id) {
     .attr("id", "gLineChart")
     .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
+  svg
+    .append("text")
+    .attr("class", "yLabelScatterPlot")
+    .attr("text-anchor", "end")
+    .attr("y", -50)
+    .attr("dy", ".75em")
+    .attr("transform", "rotate(-90)")
+    .text("Live births, per 1,000 people");
+
+  svg
+    .append("text")
+    .attr("id", "xLabelScatterPlot")
+    .attr("text-anchor", "end")
+    .attr("x", width)
+    .attr("y", height + 30)
+    .text("year");
+
   d3.csv("data/crude_birth_rate-filtered.csv").then(function (_data) {
     const data = _data.filter(function (elem) {
       return 1990 <= elem.Year && elem.Year <= 2019;
@@ -206,10 +223,7 @@ function createCustomizePlot(id) {
 
     const y = d3
       .scaleLinear()
-      .domain([
-        d3.min(array, (d) => d.birthRate) - 1,
-        d3.max(array, (d) => d.birthRate) + 1,
-      ])
+      .domain([0, d3.max(array, (d) => d.birthRate) + 1])
       .range([height, 0]);
 
     svg.append("g").attr("id", "gYAxis").call(d3.axisLeft(y));
@@ -338,7 +352,14 @@ function updateScatterPlot(_start, _finish) {
   });
 }
 
-function updateCustomizePlot(_start, _finish) {
+function updateCustomizePlot(
+  _start,
+  _finish,
+  min_polarity = -1,
+  max_polarity = 1,
+  min_text_length = 0,
+  max_text_length = 20000
+) {
   const start = _.toInteger(_start);
   const finish = _.toInteger(_finish);
 
@@ -402,8 +423,18 @@ function updateCustomizePlot(_start, _finish) {
           .y((d) => y(d.birthRate))
       );
     d3.csv("data/disneyland_final_without_missing.csv").then(function (
-      disneyData
+      _disneyData
     ) {
+      const disneyData = _disneyData.filter((d) => {
+        const { Polarity, Text_length } = d;
+        return (
+          min_polarity <= Polarity &&
+          Polarity <= max_polarity &&
+          min_text_length <= Text_length &&
+          Text_length <= max_text_length
+        );
+      });
+
       const disneyGroupedByYear = _.groupBy(disneyData, (d) => {
         const { Year_Month } = d;
         const [year, month] = Year_Month.split("-").map((v) => _.toInteger(v));
