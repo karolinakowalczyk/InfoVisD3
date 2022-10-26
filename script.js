@@ -7,6 +7,15 @@ const margin = {
 const width = 600 - margin.left - margin.right;
 const height = 400 - margin.top - margin.bottom;
 
+let minPolarity = -1;
+let maxPolarity = 1;
+let minTextLength = 0;
+let maxTextLength = 20756;
+
+let sInput = 1990;
+let eInput = 2019;
+
+
 function init() {
   createChordPlot("#vi1");
   createScatterPlot("#vi2");
@@ -28,6 +37,10 @@ function getSeasonColor(season) {
   }
 }
 
+let bushValues = []
+
+
+
 function createScatterPlot(id) {
   const svg = d3
     .select(id)
@@ -44,6 +57,29 @@ function createScatterPlot(id) {
       .range([0, width]);
 
     const y = d3.scaleLinear().domain([-1, 1]).range([height, 0]);
+
+    function geekBrush() {
+      const sel = d3.brushSelection(this);
+    
+      var p = document.getElementById("p");
+    
+      let left_top = sel[0][0]
+      let right_top = sel[1][0]
+      let left_bottom = sel[0][1]
+      let right_bottom = sel[1][1]
+
+      minPolarity = y.invert(right_bottom);
+      maxPolarity = y.invert(left_bottom);
+      minTextLength = x.invert(left_top);
+      maxTextLength = x.invert(right_top);
+    
+      p.innerHTML = "( "
+        + left_top + ", " + right_top + ", " + left_bottom + ", " + right_bottom +" )";
+
+      updateCustomizePlot(sInput, eInput, minPolarity, maxPolarity, minTextLength, maxTextLength);
+    
+    }
+    
 
     svg
       .append("circle")
@@ -135,8 +171,23 @@ function createScatterPlot(id) {
       .attr("dy", ".75em")
       .attr("transform", "rotate(-90)")
       .text("polarity");
+
+    svg.call(d3.brush()
+      .on("brush", geekBrush)
+      .extent([[0, 0],[width, height]])
+    );
   });
 }
+
+
+
+
+
+
+
+
+
+
 
 function createChordPlot(id) {
   const svg = d3
@@ -287,6 +338,9 @@ function createCustomizePlot(id) {
   });
 }
 
+
+
+
 function updateScatterPlot(_start, _finish) {
   const start = _.toInteger(_start);
   const finish = _.toInteger(_finish);
@@ -358,7 +412,7 @@ function updateCustomizePlot(
   min_polarity = -1,
   max_polarity = 1,
   min_text_length = 0,
-  max_text_length = 20000
+  max_text_length = 20756
 ) {
   const start = _.toInteger(_start);
   const finish = _.toInteger(_finish);
@@ -370,6 +424,8 @@ function updateCustomizePlot(
     });
 
     const svg = d3.select("#gLineChart");
+    // console.log('hey')
+    // console.log(svg)
 
     const birthRateGroupedByYear = _.groupBy(data, (elem) =>
       _.toInteger(elem.Year)
@@ -535,6 +591,10 @@ function drawSlides() {
       labelMin,
       labelMax,
       rangeBetween
+      // minPolarity,
+      // maxPolarity,
+      // minTextLength,
+      // maxTextLength
     );
   }
 
@@ -577,15 +637,17 @@ function drawSlides() {
     inputStart.addEventListener("input", () => {
       setStartValueCustomSlider(inputStart, inputEnd, thumbLeft, rangeBetween);
       setLabelValue(labelMin, inputStart);
-      updateCustomizePlot(inputStart.value, inputEnd.value);
+      updateCustomizePlot(inputStart.value, inputEnd.value, minPolarity, maxPolarity, minTextLength, maxTextLength);
       updateScatterPlot(inputStart.value, inputEnd.value);
+      sInput = inputStart.value;
     });
 
     inputEnd.addEventListener("input", () => {
       setEndValueCustomSlider(inputEnd, inputStart, thumbRight, rangeBetween);
       setLabelValue(labelMax, inputEnd);
-      updateCustomizePlot(inputStart.value, inputEnd.value);
+      updateCustomizePlot(inputStart.value, inputEnd.value, minPolarity, maxPolarity, minTextLength, maxTextLength);
       updateScatterPlot(inputStart.value, inputEnd.value);
+      eInput = inputStart.value;
     });
 
     inputStart.addEventListener("mouseover", function () {
