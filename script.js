@@ -1,3 +1,5 @@
+const BIRTH_RATE_HSL = [303, 100];
+
 const margin = {
   top: 20,
   right: 30,
@@ -8,7 +10,8 @@ const width = 600 - margin.left - margin.right;
 const height = 400 - margin.top - margin.bottom;
 
 function init() {
-  createChordPlot("#vi1");
+  // createChordPlot("#vi1");
+  defaultChordDiagram("#div-vi1");
   createScatterPlot("#vi2");
   createCustomizePlot("#vi3");
   drawSlides();
@@ -136,6 +139,59 @@ function createScatterPlot(id) {
       .attr("transform", "rotate(-90)")
       .text("polarity");
   });
+}
+
+function defaultChordDiagram(id) {
+  const svg = d3
+    .select(id)
+    .append("svg")
+    .attr("width", 440)
+    .attr("height", 440)
+    .append("g")
+    .attr("transform", "translate(220,220)");
+
+  // create input data: a square matrix that provides flow between entities
+  const matrix = [
+    [11975, 5871, 8916, 2868],
+    [1951, 10048, 2060, 6171],
+    [8010, 16145, 8090, 8045],
+    [1013, 990, 940, 6907],
+  ];
+
+  // give this matrix to d3.chord(): it will calculates all the info we need to draw arc and ribbon
+  var res = d3
+    .chord()
+    .padAngle(0.05) // padding between entities (black arc)
+    .sortSubgroups(d3.descending)(matrix);
+
+  // add the groups on the inner part of the circle
+  svg
+    .datum(res)
+    .append("g")
+    .selectAll("g")
+    .data(function (d) {
+      return d.groups;
+    })
+    .enter()
+    .append("g")
+    .append("path")
+    .style("fill", "grey")
+    .style("stroke", "black")
+    .attr("d", d3.arc().innerRadius(200).outerRadius(210));
+
+  // Add the links between groups
+  svg
+    .datum(res)
+    .append("g")
+    .selectAll("path")
+    .data(function (d) {
+      return d;
+    })
+    .enter()
+    .append("path")
+    .attr("d", d3.ribbon().radius(200))
+    .style("fill", "#69b3a2")
+    .style("stroke", "black");
 }
 
 function createChordPlot(id) {
@@ -272,8 +328,8 @@ function createCustomizePlot(id) {
           if (!array) return "rgba(0, 0, 0, 0)";
           const value = array.length;
           const rgba = HSLToRGB(
-            0,
-            100,
+            BIRTH_RATE_HSL[0],
+            BIRTH_RATE_HSL[1],
             75 - 60 * ((value - minReviews + 1) / (maxReviews - minReviews + 1))
           );
 
@@ -292,63 +348,13 @@ function updateScatterPlot(_start, _finish) {
   const finish = _.toInteger(_finish);
 
   d3.csv("data/disneyland_final_without_missing.csv").then(function (_data) {
-    const data = data.filter(function (elem) {
-      const year = _.toInteger(elem.year);
+    const data = _data.filter(function (elem) {
+      const { Year_Month } = elem;
+      const year = _.toInteger(Year_Month.split("-")[0]);
       return start <= year && year <= finish;
     });
 
     const svg = d3.select("#gScatterPlot");
-
-    const x = d3
-      .scaleLinear()
-      .domain([0, d3.max(data, (d) => d.budget)])
-      .range([0, width]);
-    svg
-      .select("#gXAxis")
-      .call(d3.axisBottom(x).tickFormat((x) => x / 1000000 + "M"));
-
-    const y = d3.scaleLinear().domain([0, 10]).range([height, 0]);
-
-    const radiusScale = d3
-      .scaleLinear()
-      .domain([0, d3.max(data, (d) => d.title.length)])
-      .range([4, 20]);
-
-    svg.select("gYAxis").call(d3.axisLeft(y));
-
-    svg
-      .selectAll("circle.circleValues")
-      .data(data, (d) => d.title)
-      .join(
-        (enter) => {
-          circles = enter
-            .append("circle")
-            .attr("class", "circleValues itemValue")
-            .attr("cx", (d) => x(d.budget))
-            .attr("cy", (d) => y(0))
-            .attr("r", (d) => radiusScale(d.title.length))
-            .style("fill", "steelblue")
-            .style("stroke", "black")
-            .on("mouseover", (event, d) => handleMouseOver(d))
-            .on("mouseleave", (event, d) => handleMouseLeave());
-          circles
-            .transition()
-            .duration(1000)
-            .attr("cy", (d) => y(d.rating));
-          circles.append("title").text((d) => d.title);
-        },
-        (update) => {
-          update
-            .transition()
-            .duration(1000)
-            .attr("cx", (d) => x(d.budget))
-            .attr("cy", (d) => y(d.rating))
-            .attr("r", (d) => radiusScale(d.title.length));
-        },
-        (exit) => {
-          exit.remove();
-        }
-      );
   });
 }
 
@@ -463,8 +469,8 @@ function updateCustomizePlot(
                 if (!array) return "rgba(0, 0, 0, 0)";
                 const value = array.length;
                 const rgba = HSLToRGB(
-                  0,
-                  100,
+                  BIRTH_RATE_HSL[0],
+                  BIRTH_RATE_HSL[1],
                   75 -
                     60 *
                       ((value - minReviews + 1) / (maxReviews - minReviews + 1))
@@ -493,8 +499,8 @@ function updateCustomizePlot(
                 if (!array) return "rgba(0, 0, 0, 0)";
                 const value = array.length;
                 const rgba = HSLToRGB(
-                  0,
-                  100,
+                  BIRTH_RATE_HSL[0],
+                  BIRTH_RATE_HSL[1],
                   75 -
                     60 *
                       ((value - minReviews + 1) / (maxReviews - minReviews + 1))
