@@ -20,6 +20,7 @@ function init() {
   createChordPlot("#vi1");
   createScatterPlot("#vi2");
   createCustomizePlot("#vi3");
+  createScatterPlotSeasonLabels("#seasons-labels");
   drawSlides();
 }
 
@@ -29,17 +30,81 @@ function getSeasonColor(season) {
   } else if (season === "spring") {
     return "green";
   } else if (season === "summer") {
-    return "orange";
+    return "Gold";
   } else if (season === "autumn") {
-    return "brown";
+    return "SaddleBrown";
   } else {
     return "grey";
   }
 }
 
-let bushValues = []
 
+function createScatterPlotSeasonLabels(id){
+  const svg = d3
+  .select(id)
+  .attr("width", width + margin.left + margin.right)
+  .attr("height", 50 + margin.top + margin.bottom)
+  .append("g")
+  .attr("id", "gSeasonsLabels")
+  .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
+  svg
+      .append("circle")
+      .attr("cx", 0)
+      .attr("cy", 0)
+      .attr("r", 8)
+      .style("fill", "green");
+
+    svg
+      .append("text")
+      .attr("text-anchor", "end")
+      .attr("x", 55)
+      .attr("y", 3)
+      .text("spring");
+
+    svg
+      .append("circle")
+      .attr("cx", 80)
+      .attr("cy", 0)
+      .attr("r", 8)
+      .style("fill", "Gold");
+
+    svg
+      .append("text")
+      .attr("text-anchor", "end")
+      .attr("x", 145)
+      .attr("y", 3)
+      .text("summer");
+
+    svg
+      .append("circle")
+      .attr("cx", 170)
+      .attr("cy", 0)
+      .attr("r", 8)
+      .style("fill", "SaddleBrown");
+
+    svg
+      .append("text")
+      .attr("text-anchor", "end")
+      .attr("x", 230)
+      .attr("y", 3)
+      .text("autumn");
+
+    svg
+      .append("circle")
+      .attr("cx", 250)
+      .attr("cy", 0)
+      .attr("r", 8)
+      .style("fill", "blue");
+
+    svg
+      .append("text")
+      .attr("text-anchor", "end")
+      .attr("x", 305)
+      .attr("y", 3)
+      .text("winter");
+
+}
 
 function createScatterPlot(id) {
   const svg = d3
@@ -58,15 +123,16 @@ function createScatterPlot(id) {
 
     const y = d3.scaleLinear().domain([-1, 1]).range([height, 0]);
 
-    function geekBrush() {
+    function makeBrush() {
+
       const sel = d3.brushSelection(this);
     
       var p = document.getElementById("p");
     
-      let left_top = sel[0][0]
-      let right_top = sel[1][0]
-      let left_bottom = sel[0][1]
-      let right_bottom = sel[1][1]
+      let left_top = sel[0][0];
+      let right_top = sel[1][0];
+      let left_bottom = sel[0][1];
+      let right_bottom = sel[1][1];
 
       minPolarity = y.invert(right_bottom);
       maxPolarity = y.invert(left_bottom);
@@ -79,63 +145,17 @@ function createScatterPlot(id) {
       updateCustomizePlot(sInput, eInput, minPolarity, maxPolarity, minTextLength, maxTextLength);
     
     }
-    
 
-    svg
-      .append("circle")
-      .attr("cx", width)
-      .attr("cy", height - 70)
-      .attr("r", 8)
-      .style("fill", "green");
-
-    svg
-      .append("text")
-      .attr("text-anchor", "end")
-      .attr("x", width - 20)
-      .attr("y", height - 66)
-      .text("spring");
-
-    svg
-      .append("circle")
-      .attr("cx", width)
-      .attr("cy", height - 50)
-      .attr("r", 8)
-      .style("fill", "orange");
-
-    svg
-      .append("text")
-      .attr("text-anchor", "end")
-      .attr("x", width - 20)
-      .attr("y", height - 46)
-      .text("summer");
-
-    svg
-      .append("circle")
-      .attr("cx", width)
-      .attr("cy", height - 30)
-      .attr("r", 8)
-      .style("fill", "brown");
-
-    svg
-      .append("text")
-      .attr("text-anchor", "end")
-      .attr("x", width - 20)
-      .attr("y", height - 26)
-      .text("autumn");
-
-    svg
-      .append("circle")
-      .attr("cx", width)
-      .attr("cy", height - 6)
-      .attr("r", 8)
-      .style("fill", "blue");
-
-    svg
-      .append("text")
-      .attr("text-anchor", "end")
-      .attr("x", width - 20)
-      .attr("y", height)
-      .text("winter");
+    function brushended() {
+      if (!d3.brushSelection(this)) {
+        minPolarity = -1;
+        maxPolarity = 1;
+        minTextLength = 0;
+        maxTextLength = 20756;
+        updateCustomizePlot(sInput, eInput, minPolarity, maxPolarity, minTextLength, maxTextLength);
+        
+      }   
+    }  
 
     svg
       .selectAll("circle.circleValues")
@@ -147,18 +167,25 @@ function createScatterPlot(id) {
       .attr("r", 4)
       .style("fill", (d) => getSeasonColor(d.season));
 
+    svg.call(d3.brush()
+      .on("brush", makeBrush)
+      .extent([[0, 0],[width, height]])
+      .on("end", brushended)
+    );
+
     svg
       .append("g")
-      .attr("id", "gXAxis")
+      .attr("id", "gXAxisScatter")
       .attr("transform", `translate(0, ${height / 2})`)
       .call(d3.axisBottom(x));
 
-    svg.append("g").attr("id", "gYAxis").call(d3.axisLeft(y));
+    svg.append("g").attr("id", "gYAxisScatter").call(d3.axisLeft(y));
 
     svg
       .append("text")
       .attr("id", "xLabelScatterPlot")
       .attr("text-anchor", "end")
+      .attr("fill", "black")
       .attr("x", width)
       .attr("y", height / 2 + 40)
       .text("text length");
@@ -167,15 +194,12 @@ function createScatterPlot(id) {
       .append("text")
       .attr("class", "yLabelScatterPlot")
       .attr("text-anchor", "end")
+      .attr("fill", "black")
       .attr("y", -50)
       .attr("dy", ".75em")
       .attr("transform", "rotate(-90)")
       .text("polarity");
-
-    svg.call(d3.brush()
-      .on("brush", geekBrush)
-      .extent([[0, 0],[width, height]])
-    );
+ 
   });
 }
 
@@ -344,67 +368,49 @@ function createCustomizePlot(id) {
 function updateScatterPlot(_start, _finish) {
   const start = _.toInteger(_start);
   const finish = _.toInteger(_finish);
-
-  d3.csv("data/disneyland_final_without_missing.csv").then(function (_data) {
-    const data = data.filter(function (elem) {
-      const year = _.toInteger(elem.year);
-      return start <= year && year <= finish;
+  
+  d3.csv("data/disneyland_final_without_missing.csv").then(function (data) {
+    data = data.filter(function (elem) {
+        return start <= elem.year && elem.year <= finish;
     });
 
     const svg = d3.select("#gScatterPlot");
 
     const x = d3
-      .scaleLinear()
-      .domain([0, d3.max(data, (d) => d.budget)])
+      .scaleLog()
+      .domain([10, d3.max(data, (d) => parseInt(d.Text_length))])
       .range([0, width]);
-    svg
-      .select("#gXAxis")
-      .call(d3.axisBottom(x).tickFormat((x) => x / 1000000 + "M"));
 
-    const y = d3.scaleLinear().domain([0, 10]).range([height, 0]);
-
-    const radiusScale = d3
-      .scaleLinear()
-      .domain([0, d3.max(data, (d) => d.title.length)])
-      .range([4, 20]);
-
-    svg.select("gYAxis").call(d3.axisLeft(y));
+    const y = d3.scaleLinear().domain([-1, 1]).range([height, 0]);
 
     svg
-      .selectAll("circle.circleValues")
-      .data(data, (d) => d.title)
-      .join(
-        (enter) => {
-          circles = enter
-            .append("circle")
-            .attr("class", "circleValues itemValue")
-            .attr("cx", (d) => x(d.budget))
-            .attr("cy", (d) => y(0))
-            .attr("r", (d) => radiusScale(d.title.length))
-            .style("fill", "steelblue")
-            .style("stroke", "black")
-            .on("mouseover", (event, d) => handleMouseOver(d))
-            .on("mouseleave", (event, d) => handleMouseLeave());
-          circles
-            .transition()
-            .duration(1000)
-            .attr("cy", (d) => y(d.rating));
-          circles.append("title").text((d) => d.title);
-        },
-        (update) => {
-          update
-            .transition()
-            .duration(1000)
-            .attr("cx", (d) => x(d.budget))
-            .attr("cy", (d) => y(d.rating))
-            .attr("r", (d) => radiusScale(d.title.length));
-        },
-        (exit) => {
-          exit.remove();
-        }
-      );
+        .selectAll("circle.circleValues")
+        .data(data, (d) => d.Review_ID)
+        .join(
+            (enter) => {
+                circles = enter
+                    .append("circle")
+                    .attr("class", "circleValues itemValue")
+                    .attr("cx", (d) => x(d.Text_length))
+                    .attr("cy", (d) => y(d.Polarity))
+                    .attr("r", 4)
+                    .style("fill", (d) => getSeasonColor(d.season))
+            },
+            (update) => {
+                update
+                    .transition()
+                    .duration(1000)
+                    .attr("cx", (d) => x(d.Text_length))
+                    .attr("cy", (d) => y(d.Polarity))
+                    .attr("r", 4);
+            },
+            (exit) => {
+                exit.remove();
+            }
+        );
   });
 }
+
 
 function updateCustomizePlot(
   _start,
@@ -424,8 +430,6 @@ function updateCustomizePlot(
     });
 
     const svg = d3.select("#gLineChart");
-    // console.log('hey')
-    // console.log(svg)
 
     const birthRateGroupedByYear = _.groupBy(data, (elem) =>
       _.toInteger(elem.Year)
@@ -647,7 +651,7 @@ function drawSlides() {
       setLabelValue(labelMax, inputEnd);
       updateCustomizePlot(inputStart.value, inputEnd.value, minPolarity, maxPolarity, minTextLength, maxTextLength);
       updateScatterPlot(inputStart.value, inputEnd.value);
-      eInput = inputStart.value;
+      eInput = inputEnd.value;
     });
 
     inputStart.addEventListener("mouseover", function () {
