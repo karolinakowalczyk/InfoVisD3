@@ -10,7 +10,7 @@ const width = 600 - margin.left - margin.right;
 const height = 400 - margin.top - margin.bottom;
 
 function init() {
-  // createChordPlot("#vi1");
+  createChordPlot("#vi1");
   defaultChordDiagram("#div-vi1");
   createScatterPlot("#vi2");
   createCustomizePlot("#vi3");
@@ -150,66 +150,245 @@ function defaultChordDiagram(id) {
     .append("g")
     .attr("transform", "translate(220,220)");
 
-  // create input data: a square matrix that provides flow between entities
-  const matrix = [
-    [11975, 5871, 8916, 2868],
-    [1951, 10048, 2060, 6171],
-    [8010, 16145, 8090, 8045],
-    [1013, 990, 940, 6907],
-  ];
+  d3.csv("data/disneyland_final_without_missing.csv").then(function (_data) {
+    const data = _data.filter(({ Branch, Reviewer_Location }) => {
+      return ["Portugal", "Spain", "France", "Monaco", "Germany"].includes(
+        Reviewer_Location
+      );
+    });
+    // create input data: a square matrix that provides flow between entities
+    // const matrix = [
+    //   [11975, 5871, 8916, 2868],
+    //   [1951, 10048, 2060, 6171],
+    //   [8010, 16145, 8090, 8045],
+    //   [1013, 990, 940, 6907],
+    // ];
 
-  // give this matrix to d3.chord(): it will calculates all the info we need to draw arc and ribbon
-  var res = d3
-    .chord()
-    .padAngle(0.05) // padding between entities (black arc)
-    .sortSubgroups(d3.descending)(matrix);
+    const obj = {}; // {source: {target: value}}
 
-  // add the groups on the inner part of the circle
-  svg
-    .datum(res)
-    .append("g")
-    .selectAll("g")
-    .data(function (d) {
-      return d.groups;
-    })
-    .enter()
-    .append("g")
-    .append("path")
-    .style("fill", "grey")
-    .style("stroke", "black")
-    .attr("d", d3.arc().innerRadius(200).outerRadius(210));
+    data.forEach(({ Branch, Reviewer_Location }) => {
+      if (!obj.hasOwnProperty(Branch)) obj[Branch] = {};
+      if (!obj[Branch].hasOwnProperty(Reviewer_Location))
+        obj[Branch][Reviewer_Location] = 0;
+      obj[Branch][Reviewer_Location]++;
+    });
 
-  // Add the links between groups
-  svg
-    .datum(res)
-    .append("g")
-    .selectAll("path")
-    .data(function (d) {
-      return d;
-    })
-    .enter()
-    .append("path")
-    .attr("d", d3.ribbon().radius(200))
-    .style("fill", "#69b3a2")
-    .style("stroke", "black");
+    const array = [];
+    Object.entries(obj).forEach(([branch, branchObj]) => {
+      Object.entries(branchObj).forEach(([originCountry, value]) => {
+        array.push({ source: originCountry, target: branch, value });
+      });
+    });
+    console.log('"Start Filter"', "Start Filter");
+    const names = data
+      .map(({ Branch, Reviewer_Location }) => [Branch, Reviewer_Location])
+      .flatMap((num) => num)
+      .filter((value, index, self) => self.indexOf(value) === index);
+
+    console.log("names", names);
+    const color = d3.scaleOrdinal(names, d3.schemeCategory10);
+
+    const index = new Map(names.map((name, i) => [name, i]));
+    const matrix = Array.from(index, () => new Array(names.length).fill(0));
+    for (const { source, target, value } of array) {
+      matrix[index.get(source)][index.get(target)] += value;
+    }
+
+    // give this matrix to d3.chord(): it will calculates all the info we need to draw arc and ribbon
+    const res = d3
+      .chord()
+      .padAngle(0.05) // padding between entities (black arc)
+      .sortSubgroups(d3.descending)(matrix);
+
+    // add the groups on the inner part of the circle
+    svg
+      .datum(res)
+      .append("g")
+      .selectAll("g")
+      .data(function (d) {
+        return d.groups;
+      })
+      .enter()
+      .append("g")
+      .append("path")
+      .style("fill", "grey")
+      .style("stroke", "black")
+      .attr("d", d3.arc().innerRadius(230).outerRadius(240));
+
+    // Add a tooltip div. Here I define the general feature of the tooltip: stuff that do not depend on the data point.
+    // Its opacity is set to 0: we don't see it by default.
+    const tooltip = d3
+      .select("#vi1")
+      .append("div")
+      .style("opacity", 0)
+      .attr("class", "tooltip")
+      .style("background-color", "white")
+      .style("border", "solid")
+      .style("border-width", "1px")
+      .style("border-radius", "5px")
+      .style("padding", "10px");
+
+    // A function that change this tooltip when the user hover a point.
+    // Its opacity is set to 1: we can now see it. Plus it set the text and position of tooltip depending on the datapoint (d)
+    const showTooltip = function (d) {
+      console.log("d", d);
+      tooltip
+        .style("opacity", 1)
+        .html(
+          "Source: " +
+            names[d.target.__data__.source.index] +
+            "<br>Target: " +
+            names[d.target.__data__.target.index]
+        )
+        .attr("id", "TOOLTIP")
+        .style("left", d.pageX + 15 + "px")
+        .style("top", d.pageY - 28 + "px");
+    };
+
+    // A function that change this tooltip when the leaves a point: just need to set opacity to 0 again
+    const hideTooltip = function (d) {
+      tooltip.transition().duration(1000).style("opacity", 0);
+    };
+
+    // Add the links between groups
+    svg
+      .datum(res)
+      .append("g")
+      .selectAll("path")
+      .data(function (d) {
+        return d;
+      })
+      .enter()
+      .append("path")
+      .attr("d", d3.ribbon().radius(220))
+      .style("fill", "#69b3a2")
+      .style("stroke", "black")
+      .on("mouseover", showTooltip)
+      .on("mouseleave", hideTooltip);
+  });
 }
 
 function createChordPlot(id) {
+  // const svg = d3
+  //   .select(id)
+  //   .attr("width", width + margin.left + margin.right)
+  //   .attr("height", height + margin.top + margin.bottom)
+  //   .append("g")
+  //   .attr("id", "gScatterPlot")
+  //   .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
   const svg = d3
     .select(id)
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g")
-    .attr("id", "gScatterPlot")
-    .attr("transform", `translate(${margin.left}, ${margin.top})`);
+    .attr("viewBox", [-width / 2, -height / 2, width, height]);
+
+  const innerRadius = Math.min(width, height) * 0.5 - 20;
+  const outerRadius = innerRadius + 6;
+  const formatValue = (x) => `${x.toFixed(0)}B`;
+
+  const ribbon = d3
+    .ribbonArrow()
+    .radius(innerRadius - 0.5)
+    .padAngle(1 / innerRadius);
+  const arc = d3.arc().innerRadius(innerRadius).outerRadius(outerRadius);
+  const chord = d3
+    .chordDirected()
+    .padAngle(12 / innerRadius)
+    .sortSubgroups(d3.descending)
+    .sortChords(d3.descending);
 
   d3.csv("data/disneyland_final_without_missing.csv").then(function (data) {
-    const x = d3
-      .scaleLinear()
-      .domain([0, d3.max(data, (d) => parseInt(d.Text_length))])
-      .range([0, width]);
+    const obj = {}; // {source: {target: value}}
 
-    const y = d3.scaleLinear().domain([-1, 1]).range([height, 0]);
+    data.forEach(({ Branch, Reviewer_Location }) => {
+      if (!obj.hasOwnProperty(Branch)) obj[Branch] = {};
+      if (!obj[Branch].hasOwnProperty(Reviewer_Location))
+        obj[Branch][Reviewer_Location] = 0;
+      obj[Branch][Reviewer_Location]++;
+    });
+
+    const array = [];
+    Object.entries(obj).forEach(([branch, branchObj]) => {
+      Object.entries(branchObj).forEach(([originCountry, value]) => {
+        array.push({ source: originCountry, target: branch, value });
+      });
+    });
+
+    const names = data
+      .map(({ Branch, Reviewer_Location }) => [Branch, Reviewer_Location])
+      .flatMap((num) => num)
+      .filter((value, index, self) => self.indexOf(value) === index);
+
+    const color = d3.scaleOrdinal(names, d3.schemeCategory10);
+
+    const index = new Map(names.map((name, i) => [name, i]));
+    const matrix = Array.from(index, () => new Array(names.length).fill(0));
+    for (const { source, target, value } of array) {
+      const row = matrix[index.get(source)];
+      const col = (row[index.get(target)] += value);
+    }
+
+    const chords = chord(matrix);
+    console.log("matrix", matrix);
+    console.log("chords", chords);
+
+    const textId = "chord-diagram";
+
+    svg
+      .append("path")
+      .attr("id", textId)
+      .attr("fill", "none")
+      .attr(
+        "d",
+        d3.arc()({ outerRadius, startAngle: 0, endAngle: 2 * Math.PI })
+      );
+
+    svg
+      .append("g")
+      .attr("fill-opacity", 0.75)
+      .selectAll("g")
+      .data(chords)
+      .join("path")
+      .attr("d", ribbon)
+      .attr("fill", (d) => color(names[d.target.index]))
+      .style("mix-blend-mode", "multiply")
+      .append("title")
+      .text(
+        (d) =>
+          `${names[d.source.index]} owes ${names[d.target.index]} ${formatValue(
+            d.source.value
+          )}`
+      );
+
+    svg
+      .append("g")
+      .attr("font-family", "sans-serif")
+      .attr("font-size", 10)
+      .selectAll("g")
+      .data(chords.groups)
+      .join("g")
+      .call((g) =>
+        g
+          .append("path")
+          .attr("d", arc)
+          .attr("fill", (d) => color(names[d.index]))
+          .attr("stroke", "#fff")
+      )
+      .call((g) =>
+        g
+          .append("text")
+          .attr("dy", -3)
+          .append("textPath")
+          .attr("xlink:href", textId)
+          .attr("startOffset", (d) => d.startAngle * outerRadius)
+          .text((d) => names[d.index])
+      )
+      .call((g) =>
+        g.append("title").text(
+          (d) => `${names[d.index]}
+      owes ${formatValue(d3.sum(matrix[d.index]))}
+      is owed ${formatValue(d3.sum(matrix, (row) => row[d.index]))}`
+        )
+      );
   });
 }
 
