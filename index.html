@@ -6,14 +6,10 @@
     <script src="script.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/d3-path@3"></script>
-    <script src="https://cdn.jsdelivr.net/npm/d3-chord@3"></script>
-    <script>
-      const chord = d3.chord();
-    </script>
   </head>
 
   <body onload="init()">
+    <button onclick="resetBrush()">Clear</button>
     <div>
       <div class="range-slider">
         <div class="range-labels">
@@ -43,5 +39,15 @@
         <div><svg id="vi3"></svg></div>
       </div>
     </div>
+    <!-- <div style="margin-top: 50px; display: flex; flex-direction: row">
+      <div style="width: 50%; float: left"></div>
+      <div
+        style="width: 50%; float: left; display: flex; flex-direction: column"
+      >
+        <div style="height: 40px"><svg id="seasons-labels"></svg></div>
+        <div><svg id="vi2"></svg></div>
+        <div><svg id="vi3"></svg></div>
+      </div>
+    </div> -->
   </body>
 </html>
