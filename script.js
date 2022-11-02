@@ -1,4 +1,5 @@
 const BIRTH_RATE_HSL = [303, 100];
+const CHORD_HSL = [39, 100];
 
 const margin = {
   top: 20,
@@ -10,10 +11,9 @@ const width = 600 - margin.left - margin.right;
 const height = 400 - margin.top - margin.bottom;
 
 function init() {
-  createChordPlot("#vi1");
   defaultChordDiagram("#div-vi1");
-  createScatterPlot("#vi2");
-  createCustomizePlot("#vi3");
+  // createScatterPlot("#vi2");
+  // createCustomizePlot("#vi3");
   drawSlides();
 }
 
@@ -141,20 +141,218 @@ function createScatterPlot(id) {
   });
 }
 
+function chordPlot(id, matrix, tags) {
+  // Genres, check de readme daar staat visueel hoe je dit uitleest.
+  // const data = [
+  //   [9962, 1196, 94, 93, 18],
+  //   [1196, 9102, 11, 343, 169],
+  //   [94, 11, 7143, 138, 32],
+  //   [93, 343, 138, 6440, 75],
+  //   [18, 169, 32, 75, 4886],
+  // ];
+  const data = matrix;
+  // const genres = [
+  //   "Psychologischverhaal",
+  //   "Thriller",
+  //   "Detective",
+  //   "Romantischverhaal",
+  //   "Sciencefiction",
+  // ];
+  const genres = tags;
+  const w = 600;
+  const h = 600;
+
+  const svg = d3
+    .select(id)
+    .attr("width", w)
+    .attr("height", h)
+    .append("g")
+    .attr("transform", `translate(${w / 10},${h / 7})`);
+
+  const outerRadius = Math.min(width, height) * 0.8 - 40;
+  const innerRadius = outerRadius - 30;
+
+  const formatValue = d3.formatPrefix(",.0", 1e3);
+
+  const chord = d3.chord().padAngle(0.05).sortSubgroups(d3.ascending);
+
+  const arc = d3.arc().innerRadius(innerRadius).outerRadius(outerRadius);
+
+  const ribbon = d3.ribbon().radius(innerRadius);
+
+  const color = d3
+    .scaleOrdinal()
+    .range(["#ed0b0b", "#03aa24", "#f2ae04", "#1f03f1", "#e1ed04"]);
+
+  const g = svg
+    .append("g")
+    .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")")
+    .datum(chord(data));
+
+  const group = g
+    .append("g")
+    .attr("class", "groups")
+    .selectAll("g")
+    .data(function (chords) {
+      return chords.groups;
+    })
+    .enter()
+    .append("g");
+
+  group
+    .append("path")
+    .style("fill", function (d) {
+      console.log("d", d);
+      return color(d.index);
+    })
+    .style("stroke", function (d) {
+      return d3.rgb(color(d.index)).darker();
+    })
+    .attr("id", function (d, i) {
+      return "group" + d.index;
+    })
+    .attr("d", arc)
+    .on("mouseover", fade(0.1))
+    .on("mouseout", fade(1));
+
+  group.append("title").text(function (d) {
+    return groupTip(d);
+  });
+
+  group
+    .append("text")
+    .attr("x", 6)
+    .attr("dy", 15)
+    .append("textPath")
+    .attr("xlink:href", function (d) {
+      return "#group" + d.index;
+    })
+    .text(function (chords, i) {
+      return genres[i];
+    })
+    .style("fill", "black");
+
+  const groupTick = group
+    .selectAll(".group-tick")
+    .data(function (d) {
+      return groupTicks(d, 1e3);
+    })
+    .enter()
+    .append("g")
+    .attr("class", "group-tick")
+    .attr("transform", function (d) {
+      return (
+        "rotate(" +
+        ((d.angle * 180) / Math.PI - 90) +
+        ") translate(" +
+        outerRadius +
+        ",0)"
+      );
+    });
+
+  groupTick
+    .append("line")
+    .attr("x1", 1)
+    .attr("y1", 0)
+    .attr("x2", 5)
+    .attr("y2", 0)
+    .style("stroke", "#000");
+
+  groupTick
+    .filter(function (d) {
+      return d.value % 1e3 === 0;
+    })
+    .append("text")
+    .attr("x", 8)
+    .attr("dy", ".35em")
+    .attr("transform", function (d) {
+      return d.angle > Math.PI ? "rotate(180) translate(-16)" : null;
+    })
+    .style("text-anchor", function (d) {
+      return d.angle > Math.PI ? "end" : null;
+    })
+    .text(function (d) {
+      return formatValue(d.value);
+    });
+
+  const ribbons = g
+    .append("g")
+    .attr("class", "ribbons")
+    .selectAll("path")
+    .data(function (chords) {
+      return chords;
+    })
+    .enter()
+    .append("path")
+    .attr("d", ribbon)
+    .style("fill", function (d) {
+      return color(d.target.index);
+    })
+    .style("stroke", function (d) {
+      return d3.rgb(color(d.target.index)).darker();
+    });
+
+  ribbons.append("title").text(function (d) {
+    return chordTip(d);
+  });
+
+  // Returns an array of tick angles and values for a given group and step.
+  function groupTicks(d, step) {
+    const k = (d.endAngle - d.startAngle) / d.value;
+    return d3.range(0, d.value, step).map(function (value) {
+      return { value: value, angle: value * k + d.startAngle };
+    });
+  }
+
+  function fade(opacity) {
+    return function (d, i) {
+      ribbons
+        .filter(function (d) {
+          return d.source.index != i && d.target.index != i;
+        })
+        .transition()
+        .style("opacity", opacity);
+    };
+  }
+
+  function chordTip(d) {
+    const j = d3.formatPrefix(",.0", 1e1);
+    return (
+      "Aantal boeken met genres:\n" +
+      genres[d.target.index] +
+      " en " +
+      genres[d.source.index] +
+      ": " +
+      j(d.source.value)
+    );
+  }
+
+  function groupTip(d) {
+    const j = d3.formatPrefix(",.0", 1e1);
+    return (
+      "Totaal aantal boeken met het genre " +
+      genres[d.index] +
+      ":\n" +
+      j(d.value)
+    );
+  }
+}
+
 function defaultChordDiagram(id) {
+  const w = 600;
+  const h = 600;
+
   const svg = d3
     .select(id)
     .append("svg")
-    .attr("width", 440)
-    .attr("height", 440)
+    .attr("width", w)
+    .attr("height", h)
     .append("g")
-    .attr("transform", "translate(220,220)");
+    .attr("transform", `translate(${w / 2},${h / 2})`);
 
   d3.csv("data/disneyland_final_without_missing.csv").then(function (_data) {
     const data = _data.filter(({ Branch, Reviewer_Location }) => {
-      return ["Portugal", "Spain", "France", "Monaco", "Germany"].includes(
-        Reviewer_Location
-      );
+      return ["Spain", "France", "Germany"].includes(Reviewer_Location);
     });
     // create input data: a square matrix that provides flow between entities
     // const matrix = [
@@ -172,14 +370,14 @@ function defaultChordDiagram(id) {
         obj[Branch][Reviewer_Location] = 0;
       obj[Branch][Reviewer_Location]++;
     });
-
+    console.log("obj", obj);
     const array = [];
     Object.entries(obj).forEach(([branch, branchObj]) => {
       Object.entries(branchObj).forEach(([originCountry, value]) => {
+        // array.push({ source: branch, target: originCountry, value });
         array.push({ source: originCountry, target: branch, value });
       });
     });
-    console.log('"Start Filter"', "Start Filter");
     const names = data
       .map(({ Branch, Reviewer_Location }) => [Branch, Reviewer_Location])
       .flatMap((num) => num)
@@ -192,7 +390,12 @@ function defaultChordDiagram(id) {
     const matrix = Array.from(index, () => new Array(names.length).fill(0));
     for (const { source, target, value } of array) {
       matrix[index.get(source)][index.get(target)] += value;
+      // matrix[index.get(target)][index.get(source)] += value;
     }
+
+    console.log("array", array, matrix);
+    chordPlot("#vi1", matrix, names);
+    return;
 
     // give this matrix to d3.chord(): it will calculates all the info we need to draw arc and ribbon
     const res = d3
@@ -218,7 +421,7 @@ function defaultChordDiagram(id) {
     // Add a tooltip div. Here I define the general feature of the tooltip: stuff that do not depend on the data point.
     // Its opacity is set to 0: we don't see it by default.
     const tooltip = d3
-      .select("#vi1")
+      .select(id)
       .append("div")
       .style("opacity", 0)
       .attr("class", "tooltip")
@@ -241,14 +444,21 @@ function defaultChordDiagram(id) {
             names[d.target.__data__.target.index]
         )
         .attr("id", "TOOLTIP")
+        .style("z-index", 1000)
+        .style("border", "2px red solid")
+        .style("fill", "black")
         .style("left", d.pageX + 15 + "px")
         .style("top", d.pageY - 28 + "px");
     };
 
     // A function that change this tooltip when the leaves a point: just need to set opacity to 0 again
     const hideTooltip = function (d) {
-      tooltip.transition().duration(1000).style("opacity", 0);
+      tooltip.style("opacity", 0);
+      // tooltip.transition().duration(500).style("opacity", 0);
     };
+
+    const MIN = _.maxBy(res, (d) => d.source.value).source.value;
+    const MAX = _.minBy(res, (d) => d.source.value).source.value;
 
     // Add the links between groups
     svg
@@ -261,7 +471,16 @@ function defaultChordDiagram(id) {
       .enter()
       .append("path")
       .attr("d", d3.ribbon().radius(220))
-      .style("fill", "#69b3a2")
+      .style("fill", (d) => {
+        const rgba = HSLToRGB(
+          CHORD_HSL[0],
+          CHORD_HSL[1],
+          75 - 60 * ((d.source.value - MIN + 1) / (MAX - MIN + 1))
+        );
+
+        return rgba;
+      })
+      // .style("fill", "#69b3a2")
       .style("stroke", "black")
       .on("mouseover", showTooltip)
       .on("mouseleave", hideTooltip);
