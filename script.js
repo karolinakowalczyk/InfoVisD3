@@ -127,8 +127,6 @@ function createScatterPlot(id) {
 
       const sel = d3.brushSelection(this);
     
-      var p = document.getElementById("p");
-    
       let left_top = sel[0][0];
       let right_top = sel[1][0];
       let left_bottom = sel[0][1];
@@ -138,9 +136,6 @@ function createScatterPlot(id) {
       maxPolarity = y.invert(left_bottom);
       minTextLength = x.invert(left_top);
       maxTextLength = x.invert(right_top);
-    
-      p.innerHTML = "( "
-        + left_top + ", " + right_top + ", " + left_bottom + ", " + right_bottom +" )";
 
       updateCustomizePlot(sInput, eInput, minPolarity, maxPolarity, minTextLength, maxTextLength);
     
