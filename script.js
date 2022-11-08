@@ -1,5 +1,30 @@
-const BIRTH_RATE_HSL = [303, 100];
+const DENSITY_OF_REVIEWERS_HSL = [303, 100];
+const BIRTH_RATE_HSL = DENSITY_OF_REVIEWERS_HSL;
+const SCENTED_WIDGET_COUNTRY_HSL = DENSITY_OF_REVIEWERS_HSL;
+const SCENTED_WIDGET_BRANCH_HSL = DENSITY_OF_REVIEWERS_HSL;
 const CHORD_HSL = [39, 100];
+
+const INIT_START_YEAR_CUSTOMIZED_PLOT = 2010;
+const COUNTRY_SELECTOR_BG = "rgba(100, 100, 0, 0.5)";
+
+const DISNEDY_BRANCHES = [
+  "Disneyland_Paris",
+  "Disneyland_HongKong",
+  "Disneyland_California",
+];
+
+const DISNEY_COLORS = {
+  Disneyland_Paris: "blue",
+  Disneyland_HongKong: "red",
+  Disneyland_California: "green",
+};
+
+const SEASONS = {
+  winter: [12, 1, 2],
+  spring: [3, 4, 5],
+  summer: [6, 7, 8],
+  autumn: [9, 10, 11],
+};
 
 const margin = {
   top: 20,
@@ -15,242 +40,426 @@ let maxPolarity = 1;
 let minTextLength = 0;
 let maxTextLength = 20756;
 
-let sInput = 1990;
+let countriesFilter = [];
+let branchesFilter = [];
+
+let months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+let selectedSeason = null;
+
+let sInput = 2010;
 let eInput = 2019;
 
-function init() {
-  defaultChordDiagram("#div-vi1");
-  // createScatterPlot("#vi2");
-  // createCustomizePlot("#vi3");
+let disneyData = [];
+let crudeBirthRateFiltered = [];
+
+async function init() {
+  disneyData = await loadDisneyData();
+  crudeBirthRateFiltered = await loadBirthRateData();
+
   drawSlides();
+  drawCountryFilter();
+  drawBranchesFilter();
+  createScatterPlotSeasonLabels();
+  createScatterPlot();
+  createCustomizePlot();
+  createChordDiagram();
+  // createChordDiagram2(disneyData);
 }
 
 function getSeasonColor(season) {
   if (season === "winter") {
-    return "blue";
+    return "rgba(135,206,250, 0.5)";
   } else if (season === "spring") {
-    return "green";
+    return "rgba(0,255,0, 0.5)";
   } else if (season === "summer") {
-    return "Gold";
+    return "rgba(255,215,0, 0.5)";
   } else if (season === "autumn") {
-    return "SaddleBrown";
+    return "rgba(55, 27, 7, 0.5)";
   } else {
     return "grey";
   }
 }
 
-function createScatterPlotSeasonLabels(id) {
-  const svg = d3
-    .select(id)
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", 50 + margin.top + margin.bottom)
-    .append("g")
-    .attr("id", "gSeasonsLabels")
-    .attr("transform", `translate(${margin.left}, ${margin.top})`);
+const loadDisneyData = async () => {
+  const data = await d3.csv("data/disneyland_final_without_missing.csv");
+  return data;
+};
 
-  svg
-    .append("circle")
-    .attr("cx", 0)
-    .attr("cy", 0)
-    .attr("r", 8)
-    .style("fill", "green");
+const loadBirthRateData = async () => {
+  const data = await d3.csv("data/crude_birth_rate-filtered.csv");
+  return data;
+};
 
-  svg
-    .append("text")
-    .attr("text-anchor", "end")
-    .attr("x", 55)
-    .attr("y", 3)
-    .text("spring");
+const drawCountryFilter = () => {
+  const countries = disneyData
+    .map(({ Reviewer_Location }) => Reviewer_Location)
+    .filter((value, index, self) => self.indexOf(value) === index)
+    .sort((a, b) => (a < b ? -1 : 1));
 
-  svg
-    .append("circle")
-    .attr("cx", 80)
-    .attr("cy", 0)
-    .attr("r", 8)
-    .style("fill", "Gold");
+  const grouped = _.groupBy(
+    disneyData,
+    ({ Reviewer_Location }) => Reviewer_Location
+  );
+  const reviewsPerCountry = {};
+  Object.entries(grouped).forEach(([country, array]) => {
+    reviewsPerCountry[country] = array.length;
+  });
 
-  svg
-    .append("text")
-    .attr("text-anchor", "end")
-    .attr("x", 145)
-    .attr("y", 3)
-    .text("summer");
+  const list = document.getElementById("country-filter");
 
-  svg
-    .append("circle")
-    .attr("cx", 170)
-    .attr("cy", 0)
-    .attr("r", 8)
-    .style("fill", "SaddleBrown");
+  while (list.lastElementChild) {
+    list.removeChild(list.lastElementChild);
+  }
 
-  svg
-    .append("text")
-    .attr("text-anchor", "end")
-    .attr("x", 230)
-    .attr("y", 3)
-    .text("autumn");
+  const maxReviews = _.max(Object.values(reviewsPerCountry));
+  const minReviews = _.min(Object.values(reviewsPerCountry));
 
-  svg
-    .append("circle")
-    .attr("cx", 250)
-    .attr("cy", 0)
-    .attr("r", 8)
-    .style("fill", "blue");
+  countries.forEach((country) => {
+    const div = document.createElement("div");
 
-  svg
-    .append("text")
-    .attr("text-anchor", "end")
-    .attr("x", 305)
-    .attr("y", 3)
-    .text("winter");
+    const rgba = HSLToRGB(
+      SCENTED_WIDGET_COUNTRY_HSL[0],
+      SCENTED_WIDGET_COUNTRY_HSL[1],
+      100 -
+        80 *
+          ((reviewsPerCountry[country] - minReviews + 1) /
+            (maxReviews - minReviews + 1))
+    );
+
+    div.style.background = rgba;
+    div.dataset.selected = "false";
+
+    const para = document.createElement("p");
+    para.style = "margin: 0";
+    para.innerText = country;
+    div.appendChild(para);
+
+    div.addEventListener("click", async (e) => {
+      if (div.dataset.selected === "true") {
+        div.dataset.selected = "false";
+        para.innerText = `${country}`;
+        countriesFilter = countriesFilter.filter((c) => c !== country);
+      } else {
+        countriesFilter.push(country);
+        para.innerText = `>>>>> ${country}`;
+        div.dataset.selected = "true";
+      }
+      const startYear = document.getElementById("start-year-input").value;
+      const endYear = document.getElementById("end-year-input").value;
+
+      createChordDiagram(countriesFilter, branchesFilter);
+
+      updateCustomizePlot(
+        startYear,
+        endYear,
+        minPolarity,
+        maxPolarity,
+        minTextLength,
+        maxTextLength,
+        countriesFilter,
+        branchesFilter
+      );
+      updateScatterPlot(
+        startYear,
+        endYear,
+        countriesFilter,
+        minPolarity,
+        maxPolarity,
+        minTextLength,
+        maxTextLength,
+        months,
+        branchesFilter
+      );
+    });
+
+    list.appendChild(div);
+  });
+};
+
+const drawBranchesFilter = () => {
+  const branches = disneyData
+    .map(({ Branch }) => Branch)
+    .filter((value, index, self) => self.indexOf(value) === index)
+    .sort((a, b) => (a < b ? -1 : 1));
+
+  const grouped = _.groupBy(disneyData, ({ Branch }) => Branch);
+  const reviewsPerBranch = {};
+  Object.entries(grouped).forEach(([branch, array]) => {
+    reviewsPerBranch[branch] = array.length;
+  });
+
+  const list = document.getElementById("branch-filter");
+
+  while (list.lastElementChild) {
+    list.removeChild(list.lastElementChild);
+  }
+
+  const maxReviews = _.max(Object.values(reviewsPerBranch));
+  const minReviews = _.min(Object.values(reviewsPerBranch));
+
+  branches.forEach((branch) => {
+    const div = document.createElement("div");
+
+    const rgba = HSLToRGB(
+      SCENTED_WIDGET_BRANCH_HSL[0],
+      SCENTED_WIDGET_BRANCH_HSL[1],
+      80 -
+        20 *
+          ((reviewsPerBranch[branch] - minReviews + 1) /
+            (maxReviews - minReviews + 1))
+    );
+
+    div.style.background = rgba;
+    div.dataset.selected = "false";
+
+    const para = document.createElement("p");
+    para.style = "margin: 0";
+    para.innerText = branch;
+    div.appendChild(para);
+
+    div.addEventListener("click", async (e) => {
+      if (div.dataset.selected === "true") {
+        div.dataset.selected = "false";
+        para.innerText = `${branch}`;
+        branchesFilter = branchesFilter.filter((c) => c !== branch);
+      } else {
+        branchesFilter.push(branch);
+        para.innerText = `>>>>> ${branch}`;
+        div.dataset.selected = "true";
+      }
+      const startYear = document.getElementById("start-year-input").value;
+      const endYear = document.getElementById("end-year-input").value;
+
+      createChordDiagram(countriesFilter, branchesFilter);
+
+      updateCustomizePlot(
+        startYear,
+        endYear,
+        minPolarity,
+        maxPolarity,
+        minTextLength,
+        maxTextLength,
+        countriesFilter,
+        branchesFilter
+      );
+      updateScatterPlot(
+        startYear,
+        endYear,
+        countriesFilter,
+        minPolarity,
+        maxPolarity,
+        minTextLength,
+        maxTextLength,
+        months,
+        branchesFilter
+      );
+    });
+
+    list.appendChild(div);
+  });
+};
+
+function createScatterPlotSeasonLabels() {
+  const winter = document.getElementById("season_label-winter");
+  const spring = document.getElementById("season_label-spring");
+  const summer = document.getElementById("season_label-summer");
+  const autumn = document.getElementById("season_label-autumn");
+
+  const divs = [
+    { div: winter, season: "winter" },
+    { div: summer, season: "summer" },
+    { div: spring, season: "spring" },
+    { div: autumn, season: "autumn" },
+  ];
+
+  divs.forEach(({ div, season }) => {
+    div.addEventListener("click", async (e) => {
+      if (season === selectedSeason) {
+        months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        selectedSeason = null;
+        divs.forEach(({ div }) => (div.style.opacity = 1));
+      } else {
+        months = SEASONS[season];
+        selectedSeason = season;
+        divs.forEach(({ div, season }) => {
+          if (season === selectedSeason) {
+            div.style.opacity = 1;
+          } else {
+            div.style.opacity = 0.5;
+          }
+        });
+      }
+      updateScatterPlot(
+        sInput,
+        eInput,
+        countriesFilter,
+        minPolarity,
+        maxPolarity,
+        minTextLength,
+        maxTextLength,
+        months
+      );
+    });
+  });
 }
 
-function createScatterPlot(id) {
+function createScatterPlot() {
   const svg = d3
-    .select(id)
+    .select("#scatter")
     .attr("width", width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom)
     .append("g")
     .attr("id", "gScatterPlot")
     .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
-  d3.csv("data/disneyland_final_without_missing.csv").then(function (data) {
-    const x = d3
-      .scaleLog()
-      .domain([10, d3.max(data, (d) => parseInt(d.Text_length))])
-      .range([0, width]);
+  const data = disneyData;
 
-    const y = d3.scaleLinear().domain([-1, 1]).range([height, 0]);
+  const minLength = d3.min(data, (d) => parseInt(d.Text_length));
+  const x = d3
+    .scaleLog()
+    .domain([
+      _.max([minLength - 1, 1]),
+      d3.max(data, (d) => parseInt(d.Text_length)),
+    ])
+    .range([0, width]);
 
-    function makeBrush() {
-      const sel = d3.brushSelection(this);
+  const y = d3.scaleLinear().domain([-1, 1]).range([height, 0]);
 
-      var p = document.getElementById("p");
+  async function makeBrush() {
+    const sel = d3.brushSelection(this);
 
-      let left_top = sel[0][0];
-      let right_top = sel[1][0];
-      let left_bottom = sel[0][1];
-      let right_bottom = sel[1][1];
+    // var p = document.getElementById("p");
 
-      minPolarity = y.invert(right_bottom);
-      maxPolarity = y.invert(left_bottom);
-      minTextLength = x.invert(left_top);
-      maxTextLength = x.invert(right_top);
+    let left_top = sel[0][0];
+    let right_top = sel[1][0];
+    let left_bottom = sel[0][1];
+    let right_bottom = sel[1][1];
 
-      p.innerHTML =
-        "( " +
-        left_top +
-        ", " +
-        right_top +
-        ", " +
-        left_bottom +
-        ", " +
-        right_bottom +
-        " )";
+    minPolarity = y.invert(right_bottom);
+    maxPolarity = y.invert(left_bottom);
+    minTextLength = x.invert(left_top);
+    maxTextLength = x.invert(right_top);
 
+    // p.innerHTML =
+    //   "( " +
+    //   left_top +
+    //   ", " +
+    //   right_top +
+    //   ", " +
+    //   left_bottom +
+    //   ", " +
+    //   right_bottom +
+    //   " )";
+
+    updateCustomizePlot(
+      sInput,
+      eInput,
+      minPolarity,
+      maxPolarity,
+      minTextLength,
+      maxTextLength,
+      countriesFilter
+    );
+    updateScatterPlot(
+      sInput,
+      eInput,
+      countriesFilter,
+      minPolarity,
+      maxPolarity,
+      minTextLength,
+      maxTextLength
+    );
+  }
+
+  async function brushended() {
+    if (!d3.brushSelection(this)) {
+      minPolarity = -1;
+      maxPolarity = 1;
+      minTextLength = 0;
+      maxTextLength = 20756;
       updateCustomizePlot(
         sInput,
         eInput,
         minPolarity,
         maxPolarity,
         minTextLength,
+        maxTextLength,
+        countriesFilter
+      );
+      updateScatterPlot(
+        sInput,
+        eInput,
+        countriesFilter,
+        minPolarity,
+        maxPolarity,
+        minTextLength,
         maxTextLength
       );
     }
+  }
 
-    function brushended() {
-      if (!d3.brushSelection(this)) {
-        minPolarity = -1;
-        maxPolarity = 1;
-        minTextLength = 0;
-        maxTextLength = 20756;
-        updateCustomizePlot(
-          sInput,
-          eInput,
-          minPolarity,
-          maxPolarity,
-          minTextLength,
-          maxTextLength
-        );
-      }
-    }
+  svg
+    .selectAll("circle.circleValues")
+    .data(data, (d) => d.Review_ID)
+    .join("circle")
+    .attr("class", "circleValues itemValue")
+    .attr("cx", (d) => x(d.Text_length))
+    .attr("cy", (d) => y(d.Polarity))
+    .attr("r", 4)
+    .style("fill", (d) => getSeasonColor(d.season));
 
-    svg
-      .selectAll("circle.circleValues")
-      .data(data, (d) => d.Review_ID)
-      .join("circle")
-      .attr("class", "circleValues itemValue")
-      .attr("cx", (d) => x(d.Text_length))
-      .attr("cy", (d) => y(d.Polarity))
-      .attr("r", 4)
-      .style("fill", (d) => getSeasonColor(d.season));
+  svg.call(
+    d3
+      .brush()
+      .on("brush", makeBrush)
+      .extent([
+        [0, 0],
+        [width, height],
+      ])
+      .on("end", brushended)
+  );
 
-    svg.call(
-      d3
-        .brush()
-        .on("brush", makeBrush)
-        .extent([
-          [0, 0],
-          [width, height],
-        ])
-        .on("end", brushended)
-    );
+  svg
+    .append("g")
+    .attr("id", "gXAxisScatter")
+    .attr("transform", `translate(0, ${height / 2})`)
+    .call(d3.axisBottom(x));
 
-    svg
-      .append("g")
-      .attr("id", "gXAxisScatter")
-      .attr("transform", `translate(0, ${height / 2})`)
-      .call(d3.axisBottom(x));
+  svg.append("g").attr("id", "gYAxisScatter").call(d3.axisLeft(y));
 
-    svg.append("g").attr("id", "gYAxisScatter").call(d3.axisLeft(y));
+  svg
+    .append("text")
+    .attr("id", "xLabelScatterPlot")
+    .attr("text-anchor", "end")
+    .attr("fill", "black")
+    .attr("x", width)
+    .attr("y", height / 2 + 40)
+    .text("text length");
 
-    svg
-      .append("text")
-      .attr("id", "xLabelScatterPlot")
-      .attr("text-anchor", "end")
-      .attr("fill", "black")
-      .attr("x", width)
-      .attr("y", height / 2 + 40)
-      .text("text length");
-
-    svg
-      .append("text")
-      .attr("class", "yLabelScatterPlot")
-      .attr("text-anchor", "end")
-      .attr("fill", "black")
-      .attr("y", -50)
-      .attr("dy", ".75em")
-      .attr("transform", "rotate(-90)")
-      .text("polarity");
-  });
+  svg
+    .append("text")
+    .attr("class", "yLabelScatterPlot")
+    .attr("text-anchor", "end")
+    .attr("fill", "black")
+    .attr("y", -50)
+    .attr("dy", ".75em")
+    .attr("transform", "rotate(-90)")
+    .text("polarity");
 }
-function chordPlot(id, matrix, tags) {
-  // Genres, check de readme daar staat visueel hoe je dit uitleest.
-  // const data = [
-  //   [9962, 1196, 94, 93, 18],
-  //   [1196, 9102, 11, 343, 169],
-  //   [94, 11, 7143, 138, 32],
-  //   [93, 343, 138, 6440, 75],
-  //   [18, 169, 32, 75, 4886],
-  // ];
+function chordPlot(matrix, tags) {
   const data = matrix;
-  // const genres = [
-  //   "Psychologischverhaal",
-  //   "Thriller",
-  //   "Detective",
-  //   "Romantischverhaal",
-  //   "Sciencefiction",
-  // ];
+
   const genres = tags;
   const w = 600;
-  const h = 600;
+  const h = 1000;
 
   const svg = d3
-    .select(id)
+    .select("#chord")
     .attr("width", w)
     .attr("height", h)
     .append("g")
-    .attr("transform", `translate(${w / 10},${h / 7})`);
+    .attr("id", "MAIN_G")
+    .attr("transform", `translate(${w / 10},${300})`);
 
   const outerRadius = Math.min(width, height) * 0.8 - 40;
   const innerRadius = outerRadius - 30;
@@ -262,10 +471,6 @@ function chordPlot(id, matrix, tags) {
   const arc = d3.arc().innerRadius(innerRadius).outerRadius(outerRadius);
 
   const ribbon = d3.ribbon().radius(innerRadius);
-
-  const color = d3
-    .scaleOrdinal()
-    .range(["#ed0b0b", "#03aa24", "#f2ae04", "#1f03f1", "#e1ed04"]);
 
   const g = svg
     .append("g")
@@ -285,11 +490,12 @@ function chordPlot(id, matrix, tags) {
   group
     .append("path")
     .style("fill", function (d) {
-      console.log("d", d);
-      return color(d.index);
+      return "gold";
+      // return color(d.index);
     })
     .style("stroke", function (d) {
-      return d3.rgb(color(d.index)).darker();
+      return "gold";
+      // return d3.rgb(color(d.index)).darker();
     })
     .attr("id", function (d, i) {
       return "group" + d.index;
@@ -311,14 +517,15 @@ function chordPlot(id, matrix, tags) {
       return "#group" + d.index;
     })
     .text(function (chords, i) {
-      return genres[i];
+      // return genres[i];
+      return "";
     })
     .style("fill", "black");
 
   const groupTick = group
     .selectAll(".group-tick")
     .data(function (d) {
-      return groupTicks(d, 1e3);
+      return groupTicks(d);
     })
     .enter()
     .append("g")
@@ -355,7 +562,7 @@ function chordPlot(id, matrix, tags) {
       return d.angle > Math.PI ? "end" : null;
     })
     .text(function (d) {
-      return formatValue(d.value);
+      return tags[d.index];
     });
 
   const ribbons = g
@@ -369,10 +576,10 @@ function chordPlot(id, matrix, tags) {
     .append("path")
     .attr("d", ribbon)
     .style("fill", function (d) {
-      return color(d.target.index);
+      return DISNEY_COLORS[tags[d.target.index]];
     })
     .style("stroke", function (d) {
-      return d3.rgb(color(d.target.index)).darker();
+      return d3.rgb(DISNEY_COLORS[tags[d.target.index]]).darker();
     });
 
   ribbons.append("title").text(function (d) {
@@ -380,20 +587,57 @@ function chordPlot(id, matrix, tags) {
   });
 
   // Returns an array of tick angles and values for a given group and step.
-  function groupTicks(d, step) {
-    const k = (d.endAngle - d.startAngle) / d.value;
-    return d3.range(0, d.value, step).map(function (value) {
-      return { value: value, angle: value * k + d.startAngle };
+  function groupTicks(d) {
+    return d3.range(0, 1, 1).map(function (value) {
+      return {
+        value: value,
+        angle: (d.endAngle + d.startAngle) / 2,
+        index: d.index,
+      };
     });
   }
 
   function fade(opacity) {
-    return function (d, i) {
+    return function (ev, ribbon) {
+      let countriesList = [];
+      let branches = [];
+      if (opacity !== 1) {
+        if (DISNEDY_BRANCHES.includes(tags[ribbon.index])) {
+          branches = [tags[ribbon.index]];
+        } else {
+          countriesList = [tags[ribbon.index]];
+        }
+      }
+      updateScatterPlot(
+        sInput,
+        eInput,
+        countriesList,
+        minPolarity,
+        maxPolarity,
+        minTextLength,
+        maxTextLength,
+        months,
+        branches
+      );
+
+      updateCustomizePlot(
+        sInput,
+        eInput,
+        minPolarity,
+        maxPolarity,
+        minTextLength,
+        maxTextLength,
+        countriesList,
+        branches
+      );
+
       ribbons
         .filter(function (d) {
-          return d.source.index != i && d.target.index != i;
+          return (
+            d.source.index != ribbon.index && d.target.index != ribbon.index
+          );
         })
-        .transition()
+        .transition(0)
         .style("opacity", opacity);
     };
   }
@@ -421,282 +665,77 @@ function chordPlot(id, matrix, tags) {
   }
 }
 
-function defaultChordDiagram(id) {
-  const w = 600;
-  const h = 600;
+function createChordDiagram(
+  countries = [],
+  branches = [],
+  startYear = sInput,
+  finishYear = eInput,
+  min_polarity = minPolarity,
+  max_polarity = maxPolarity,
+  min_text_length = minTextLength,
+  max_text_length = maxTextLength,
+  _months = months
+) {
+  d3.select("#MAIN_G").remove();
 
-  const svg = d3
-    .select(id)
-    .append("svg")
-    .attr("width", w)
-    .attr("height", h)
-    .append("g")
-    .attr("transform", `translate(${w / 2},${h / 2})`);
-
-  d3.csv("data/disneyland_final_without_missing.csv").then(function (_data) {
-    const data = _data.filter(({ Branch, Reviewer_Location }) => {
-      return ["Spain", "France", "Germany"].includes(Reviewer_Location);
-    });
-    // create input data: a square matrix that provides flow between entities
-    // const matrix = [
-    //   [11975, 5871, 8916, 2868],
-    //   [1951, 10048, 2060, 6171],
-    //   [8010, 16145, 8090, 8045],
-    //   [1013, 990, 940, 6907],
-    // ];
-
-    const obj = {}; // {source: {target: value}}
-
-    data.forEach(({ Branch, Reviewer_Location }) => {
-      if (!obj.hasOwnProperty(Branch)) obj[Branch] = {};
-      if (!obj[Branch].hasOwnProperty(Reviewer_Location))
-        obj[Branch][Reviewer_Location] = 0;
-      obj[Branch][Reviewer_Location]++;
-    });
-    console.log("obj", obj);
-    const array = [];
-    Object.entries(obj).forEach(([branch, branchObj]) => {
-      Object.entries(branchObj).forEach(([originCountry, value]) => {
-        // array.push({ source: branch, target: originCountry, value });
-        array.push({ source: originCountry, target: branch, value });
-      });
-    });
-    const names = data
-      .map(({ Branch, Reviewer_Location }) => [Branch, Reviewer_Location])
-      .flatMap((num) => num)
-      .filter((value, index, self) => self.indexOf(value) === index);
-
-    console.log("names", names);
-    const color = d3.scaleOrdinal(names, d3.schemeCategory10);
-
-    const index = new Map(names.map((name, i) => [name, i]));
-    const matrix = Array.from(index, () => new Array(names.length).fill(0));
-    for (const { source, target, value } of array) {
-      matrix[index.get(source)][index.get(target)] += value;
-      // matrix[index.get(target)][index.get(source)] += value;
+  const start = _.toInteger(startYear);
+  const finish = _.toInteger(finishYear);
+  const data = disneyData.filter(
+    ({ Year_Month, Polarity, Text_length, Reviewer_Location, Branch }) => {
+      const year = _.toInteger(Year_Month.split("-")[0]);
+      const month = _.toInteger(Year_Month.split("-")[1]);
+      return (
+        start <= year &&
+        year <= finish &&
+        min_polarity <= Polarity &&
+        Polarity <= max_polarity &&
+        min_text_length <= Text_length &&
+        Text_length <= max_text_length &&
+        _months.includes(month) &&
+        (countries.length ? countries.includes(Reviewer_Location) : true) &&
+        (branches.length ? branches.includes(Branch) : true)
+      );
     }
+  );
+  console.log("data", data);
+  const obj = {}; // {source: {target: value}}
 
-    console.log("array", array, matrix);
-    chordPlot("#vi1", matrix, names);
-    return;
-
-    // give this matrix to d3.chord(): it will calculates all the info we need to draw arc and ribbon
-    const res = d3
-      .chord()
-      .padAngle(0.05) // padding between entities (black arc)
-      .sortSubgroups(d3.descending)(matrix);
-
-    // add the groups on the inner part of the circle
-    svg
-      .datum(res)
-      .append("g")
-      .selectAll("g")
-      .data(function (d) {
-        return d.groups;
-      })
-      .enter()
-      .append("g")
-      .append("path")
-      .style("fill", "grey")
-      .style("stroke", "black")
-      .attr("d", d3.arc().innerRadius(230).outerRadius(240));
-
-    // Add a tooltip div. Here I define the general feature of the tooltip: stuff that do not depend on the data point.
-    // Its opacity is set to 0: we don't see it by default.
-    const tooltip = d3
-      .select(id)
-      .append("div")
-      .style("opacity", 0)
-      .attr("class", "tooltip")
-      .style("background-color", "white")
-      .style("border", "solid")
-      .style("border-width", "1px")
-      .style("border-radius", "5px")
-      .style("padding", "10px");
-
-    // A function that change this tooltip when the user hover a point.
-    // Its opacity is set to 1: we can now see it. Plus it set the text and position of tooltip depending on the datapoint (d)
-    const showTooltip = function (d) {
-      console.log("d", d);
-      tooltip
-        .style("opacity", 1)
-        .html(
-          "Source: " +
-            names[d.target.__data__.source.index] +
-            "<br>Target: " +
-            names[d.target.__data__.target.index]
-        )
-        .attr("id", "TOOLTIP")
-        .style("z-index", 1000)
-        .style("border", "2px red solid")
-        .style("fill", "black")
-        .style("left", d.pageX + 15 + "px")
-        .style("top", d.pageY - 28 + "px");
-    };
-
-    // A function that change this tooltip when the leaves a point: just need to set opacity to 0 again
-    const hideTooltip = function (d) {
-      tooltip.style("opacity", 0);
-      // tooltip.transition().duration(500).style("opacity", 0);
-    };
-
-    const MIN = _.maxBy(res, (d) => d.source.value).source.value;
-    const MAX = _.minBy(res, (d) => d.source.value).source.value;
-
-    // Add the links between groups
-    svg
-      .datum(res)
-      .append("g")
-      .selectAll("path")
-      .data(function (d) {
-        return d;
-      })
-      .enter()
-      .append("path")
-      .attr("d", d3.ribbon().radius(220))
-      .style("fill", (d) => {
-        const rgba = HSLToRGB(
-          CHORD_HSL[0],
-          CHORD_HSL[1],
-          75 - 60 * ((d.source.value - MIN + 1) / (MAX - MIN + 1))
-        );
-
-        return rgba;
-      })
-      // .style("fill", "#69b3a2")
-      .style("stroke", "black")
-      .on("mouseover", showTooltip)
-      .on("mouseleave", hideTooltip);
+  data.forEach(({ Branch, Reviewer_Location }) => {
+    if (!obj.hasOwnProperty(Branch)) obj[Branch] = {};
+    if (!obj[Branch].hasOwnProperty(Reviewer_Location))
+      obj[Branch][Reviewer_Location] = 0;
+    obj[Branch][Reviewer_Location]++;
   });
+  "obj", obj;
+  const array = [];
+  Object.entries(obj).forEach(([branch, branchObj]) => {
+    Object.entries(branchObj).forEach(([originCountry, value]) => {
+      array.push({ source: branch, target: originCountry, value: 1 });
+      array.push({ source: originCountry, target: branch, value });
+    });
+  });
+  const names = data
+    .map(({ Branch, Reviewer_Location }) => [Branch, Reviewer_Location])
+    .flatMap((num) => num)
+    .filter((value, index, self) => self.indexOf(value) === index);
+
+  "names", names;
+  const color = d3.scaleOrdinal(names, d3.schemeCategory10);
+
+  const index = new Map(names.map((name, i) => [name, i]));
+  const matrix = Array.from(index, () => new Array(names.length).fill(0));
+  for (const { source, target, value } of array) {
+    matrix[index.get(source)][index.get(target)] += value;
+    // matrix[index.get(target)][index.get(source)] += value;
+  }
+
+  chordPlot(matrix, names);
+  return;
 }
 
-function createChordPlot(id) {
-  // const svg = d3
-  //   .select(id)
-  //   .attr("width", width + margin.left + margin.right)
-  //   .attr("height", height + margin.top + margin.bottom)
-  //   .append("g")
-  //   .attr("id", "gScatterPlot")
-  //   .attr("transform", `translate(${margin.left}, ${margin.top})`);
-
+function createCustomizePlot() {
   const svg = d3
-    .select(id)
-    .attr("viewBox", [-width / 2, -height / 2, width, height]);
-
-  const innerRadius = Math.min(width, height) * 0.5 - 20;
-  const outerRadius = innerRadius + 6;
-  const formatValue = (x) => `${x.toFixed(0)}B`;
-
-  const ribbon = d3
-    .ribbonArrow()
-    .radius(innerRadius - 0.5)
-    .padAngle(1 / innerRadius);
-  const arc = d3.arc().innerRadius(innerRadius).outerRadius(outerRadius);
-  const chord = d3
-    .chordDirected()
-    .padAngle(12 / innerRadius)
-    .sortSubgroups(d3.descending)
-    .sortChords(d3.descending);
-
-  d3.csv("data/disneyland_final_without_missing.csv").then(function (data) {
-    const obj = {}; // {source: {target: value}}
-
-    data.forEach(({ Branch, Reviewer_Location }) => {
-      if (!obj.hasOwnProperty(Branch)) obj[Branch] = {};
-      if (!obj[Branch].hasOwnProperty(Reviewer_Location))
-        obj[Branch][Reviewer_Location] = 0;
-      obj[Branch][Reviewer_Location]++;
-    });
-
-    const array = [];
-    Object.entries(obj).forEach(([branch, branchObj]) => {
-      Object.entries(branchObj).forEach(([originCountry, value]) => {
-        array.push({ source: originCountry, target: branch, value });
-      });
-    });
-
-    const names = data
-      .map(({ Branch, Reviewer_Location }) => [Branch, Reviewer_Location])
-      .flatMap((num) => num)
-      .filter((value, index, self) => self.indexOf(value) === index);
-
-    const color = d3.scaleOrdinal(names, d3.schemeCategory10);
-
-    const index = new Map(names.map((name, i) => [name, i]));
-    const matrix = Array.from(index, () => new Array(names.length).fill(0));
-    for (const { source, target, value } of array) {
-      const row = matrix[index.get(source)];
-      const col = (row[index.get(target)] += value);
-    }
-
-    const chords = chord(matrix);
-    console.log("matrix", matrix);
-    console.log("chords", chords);
-
-    const textId = "chord-diagram";
-
-    svg
-      .append("path")
-      .attr("id", textId)
-      .attr("fill", "none")
-      .attr(
-        "d",
-        d3.arc()({ outerRadius, startAngle: 0, endAngle: 2 * Math.PI })
-      );
-
-    svg
-      .append("g")
-      .attr("fill-opacity", 0.75)
-      .selectAll("g")
-      .data(chords)
-      .join("path")
-      .attr("d", ribbon)
-      .attr("fill", (d) => color(names[d.target.index]))
-      .style("mix-blend-mode", "multiply")
-      .append("title")
-      .text(
-        (d) =>
-          `${names[d.source.index]} owes ${names[d.target.index]} ${formatValue(
-            d.source.value
-          )}`
-      );
-
-    svg
-      .append("g")
-      .attr("font-family", "sans-serif")
-      .attr("font-size", 10)
-      .selectAll("g")
-      .data(chords.groups)
-      .join("g")
-      .call((g) =>
-        g
-          .append("path")
-          .attr("d", arc)
-          .attr("fill", (d) => color(names[d.index]))
-          .attr("stroke", "#fff")
-      )
-      .call((g) =>
-        g
-          .append("text")
-          .attr("dy", -3)
-          .append("textPath")
-          .attr("xlink:href", textId)
-          .attr("startOffset", (d) => d.startAngle * outerRadius)
-          .text((d) => names[d.index])
-      )
-      .call((g) =>
-        g.append("title").text(
-          (d) => `${names[d.index]}
-      owes ${formatValue(d3.sum(matrix[d.index]))}
-      is owed ${formatValue(d3.sum(matrix, (row) => row[d.index]))}`
-        )
-      );
-  });
-}
-
-function createCustomizePlot(id) {
-  const svg = d3
-    .select(id)
+    .select("#line")
     .attr("width", width * 1.3)
     .attr("height", height + margin.top + margin.bottom)
     .append("g")
@@ -720,327 +759,348 @@ function createCustomizePlot(id) {
     .attr("y", height + 30)
     .text("year");
 
-  d3.csv("data/crude_birth_rate-filtered.csv").then(function (_data) {
-    const data = _data.filter(function (elem) {
-      return 1990 <= elem.Year && elem.Year <= 2019;
-    });
-    const birthRateGroupedByYear = _.groupBy(data, (elem) =>
-      _.toInteger(elem.Year)
-    );
-
-    const meanBirthRateByYear = {};
-    Object.entries(birthRateGroupedByYear).forEach(([year, list]) => {
-      meanBirthRateByYear[year] =
-        _.sumBy(list, (e) => _.toInteger(e["Birth rate"])) / list.length;
-    });
-
-    const yearsList = _.orderBy(Object.keys(meanBirthRateByYear), (v) =>
-      _.toInteger(v)
-    );
-
-    const array = yearsList.map((year) => ({
-      year: _.toInteger(year),
-      birthRate: meanBirthRateByYear[year],
-    }));
-
-    const x = d3
-      .scalePoint()
-      .domain(array.map((d) => d.year))
-      .range([0, width]);
-    svg
-      .append("g")
-      .attr("id", "gXAxis")
-      .attr("transform", `translate(0, ${height})`)
-      .call(
-        d3.axisBottom(x).tickFormat((x) => {
-          if (x % 5) return "";
-          return x;
-        })
-      );
-
-    const y = d3
-      .scaleLinear()
-      .domain([0, d3.max(array, (d) => d.birthRate) + 1])
-      .range([height, 0]);
-
-    svg.append("g").attr("id", "gYAxis").call(d3.axisLeft(y));
-
-    svg
-      .append("path")
-      .datum(array)
-      .attr("class", "pathValue")
-      .attr("fill", "none")
-      .attr("stroke", "steelblue")
-      .attr("stroke-width", 1.5)
-      .attr(
-        "d",
-        d3
-          .line()
-          .x((d) => x(d.year))
-          .y((d) => y(d.birthRate))
-      );
-
-    d3.csv("data/disneyland_final_without_missing.csv").then(function (
-      disneyData
-    ) {
-      const disneyGroupedByYear = _.groupBy(disneyData, (d) => {
-        const { Year_Month } = d;
-        const [year, month] = Year_Month.split("-").map((v) => _.toInteger(v));
-        return year;
-      });
-      const list = Object.entries(disneyGroupedByYear).map(([year, l]) => ({
-        year: _.toInteger(year),
-        reviews: l.length,
-      }));
-      const maxReviews = d3.max(list, (l) => l.reviews);
-      const minReviews = d3.min(list, (l) => l.reviews);
-
-      svg
-        .selectAll("circle.circleValues")
-        .data(array)
-        .join("circle")
-        .attr("class", "circleValues itemValue")
-        .attr("cx", (a) => x(a.year))
-        .attr("cy", (a) => y(a.birthRate))
-        .attr("r", 8)
-        .style("fill", (a) => {
-          const { year } = a;
-          const array = disneyGroupedByYear[year];
-          if (!array) return "rgba(0, 0, 0, 0)";
-          const value = array.length;
-          const rgba = HSLToRGB(
-            BIRTH_RATE_HSL[0],
-            BIRTH_RATE_HSL[1],
-            75 - 60 * ((value - minReviews + 1) / (maxReviews - minReviews + 1))
-          );
-
-          return rgba;
-        })
-        //   .on("mouseover", (event, a) => handleMouseOver(a))
-        //   .on("mouseleave", (event, a) => handleMouseLeave())
-        .append("title")
-        .text((a) => a.year);
-    });
+  const data = crudeBirthRateFiltered.filter(function (elem) {
+    return INIT_START_YEAR_CUSTOMIZED_PLOT <= elem.Year && elem.Year <= 2019;
   });
-}
+  const birthRateGroupedByYear = _.groupBy(data, (elem) =>
+    _.toInteger(elem.Year)
+  );
 
-function updateScatterPlot(_start, _finish) {
-  const start = _.toInteger(_start);
-  const finish = _.toInteger(_finish);
-
-  d3.csv("data/disneyland_final_without_missing.csv").then(function (data) {
-    data = data.filter(function (elem) {
-      return start <= elem.year && elem.year <= finish;
-    });
-
-    const svg = d3.select("#gScatterPlot");
-
-    const x = d3
-      .scaleLog()
-      .domain([10, d3.max(data, (d) => parseInt(d.Text_length))])
-      .range([0, width]);
-
-    const y = d3.scaleLinear().domain([-1, 1]).range([height, 0]);
-
-    svg
-      .selectAll("circle.circleValues")
-      .data(data, (d) => d.Review_ID)
-      .join(
-        (enter) => {
-          circles = enter
-            .append("circle")
-            .attr("class", "circleValues itemValue")
-            .attr("cx", (d) => x(d.Text_length))
-            .attr("cy", (d) => y(d.Polarity))
-            .attr("r", 4)
-            .style("fill", (d) => getSeasonColor(d.season));
-        },
-        (update) => {
-          update
-            .transition()
-            .duration(1000)
-            .attr("cx", (d) => x(d.Text_length))
-            .attr("cy", (d) => y(d.Polarity))
-            .attr("r", 4);
-        },
-        (exit) => {
-          exit.remove();
-        }
-      );
+  const meanBirthRateByYear = {};
+  Object.entries(birthRateGroupedByYear).forEach(([year, list]) => {
+    meanBirthRateByYear[year] =
+      _.sumBy(list, (e) => _.toInteger(e["Birth rate"])) / list.length;
   });
-}
 
-function updateCustomizePlot(
-  _start,
-  _finish,
-  min_polarity = -1,
-  max_polarity = 1,
-  min_text_length = 0,
-  max_text_length = 20000
-) {
-  const start = _.toInteger(_start);
-  const finish = _.toInteger(_finish);
+  const yearsList = _.orderBy(Object.keys(meanBirthRateByYear), (v) =>
+    _.toInteger(v)
+  );
 
-  d3.csv("data/crude_birth_rate-filtered.csv").then(function (_data) {
-    const data = _data.filter(function (elem) {
-      const year = _.toInteger(elem.Year);
-      return start <= year && year <= finish;
-    });
+  const array = yearsList.map((year) => ({
+    year: _.toInteger(year),
+    birthRate: meanBirthRateByYear[year],
+  }));
 
-    const svg = d3.select("#gLineChart");
-
-    const birthRateGroupedByYear = _.groupBy(data, (elem) =>
-      _.toInteger(elem.Year)
-    );
-    const meanBirthRateByYear = {};
-    Object.entries(birthRateGroupedByYear).forEach(([year, list]) => {
-      meanBirthRateByYear[year] =
-        _.sumBy(list, (e) => _.toInteger(e["Birth rate"])) / list.length;
-    });
-
-    const yearsList = _.orderBy(Object.keys(meanBirthRateByYear), (v) =>
-      _.toInteger(v)
-    );
-
-    const array = yearsList.map((year) => ({
-      year: _.toInteger(year),
-      birthRate: meanBirthRateByYear[year],
-    }));
-
-    const x = d3
-      .scalePoint()
-      .domain(array.map((d) => d.year))
-      .range([0, width]);
-
-    svg.select("#gXAxis").call(
+  const x = d3
+    .scalePoint()
+    .domain(array.map((d) => d.year))
+    .range([0, width]);
+  svg
+    .append("g")
+    .attr("id", "gXAxis")
+    .attr("transform", `translate(0, ${height})`)
+    .call(
       d3.axisBottom(x).tickFormat((x) => {
         if (x % 5) return "";
         return x;
       })
     );
 
-    const y = d3
-      .scaleLinear()
-      .domain([
-        d3.min(array, (d) => d.birthRate) - 1,
-        d3.max(array, (d) => d.birthRate) + 1,
-      ])
-      .range([height, 0]);
-    svg.select("#gYAxis").call(d3.axisLeft(y));
+  const y = d3
+    .scaleLinear()
+    .domain([0, d3.max(array, (d) => d.birthRate) + 1])
+    .range([height, 0]);
 
-    svg
-      .select("path.pathValue")
-      .datum(array)
-      .transition()
-      .duration(1000)
-      .attr(
-        "d",
-        d3
-          .line()
-          .x((d) => x(d.year))
-          .y((d) => y(d.birthRate))
-      );
-    d3.csv("data/disneyland_final_without_missing.csv").then(function (
-      _disneyData
-    ) {
-      const disneyData = _disneyData.filter((d) => {
-        const { Polarity, Text_length } = d;
-        return (
-          min_polarity <= Polarity &&
-          Polarity <= max_polarity &&
-          min_text_length <= Text_length &&
-          Text_length <= max_text_length
-        );
-      });
+  svg.append("g").attr("id", "gYAxis").call(d3.axisLeft(y));
 
-      const disneyGroupedByYear = _.groupBy(disneyData, (d) => {
-        const { Year_Month } = d;
-        const [year, month] = Year_Month.split("-").map((v) => _.toInteger(v));
-        return year;
-      });
-      const list = Object.entries(disneyGroupedByYear).map(([year, l]) => ({
-        year: _.toInteger(year),
-        reviews: l.length,
-      }));
-      const maxReviews = d3.max(list, (l) => l.reviews);
-      const minReviews = d3.min(list, (l) => l.reviews);
-      svg
-        .selectAll("circle.circleValues")
-        .data(array)
-        .join(
-          (enter) => {
-            const circles = enter
-              .append("circle")
-              .attr("class", "circleValues itemValue")
-              .attr("cx", (a) => x(a.year))
-              .attr("cy", (a) => y(a.birthRate))
-              .attr("r", 8)
-              .style("fill", (a) => {
-                const { year } = a;
-                const array = disneyGroupedByYear[year];
-                if (!array) return "rgba(0, 0, 0, 0)";
-                const value = array.length;
-                const rgba = HSLToRGB(
-                  BIRTH_RATE_HSL[0],
-                  BIRTH_RATE_HSL[1],
-                  75 -
-                    60 *
-                      ((value - minReviews + 1) / (maxReviews - minReviews + 1))
-                );
+  svg
+    .append("path")
+    .datum(array)
+    .attr("class", "pathValue")
+    .attr("fill", "none")
+    .attr("stroke", "steelblue")
+    .attr("stroke-width", 1.5)
+    .attr(
+      "d",
+      d3
+        .line()
+        .x((d) => x(d.year))
+        .y((d) => y(d.birthRate))
+    );
 
-                return rgba;
-              });
-            //   .on("mouseover", (event, a) => handleMouseOver(a))
-            //   .on("mouseleave", (event, a) => handleMouseLeave())
-            circles
-              .transition()
-              .duration(1000)
-              .attr("cy", (a) => y(a.birthRate));
-            circles.append("title").text((a) => a.year);
-          },
-          (update) => {
-            update
-              .transition()
-              .duration(1000)
-              .attr("cx", (a) => x(a.year))
-              .attr("cy", (a) => y(a.birthRate))
-              .attr("r", 8)
-              .style("fill", (a) => {
-                const { year } = a;
-                const array = disneyGroupedByYear[year];
-                if (!array) return "rgba(0, 0, 0, 0)";
-                const value = array.length;
-                const rgba = HSLToRGB(
-                  BIRTH_RATE_HSL[0],
-                  BIRTH_RATE_HSL[1],
-                  75 -
-                    60 *
-                      ((value - minReviews + 1) / (maxReviews - minReviews + 1))
-                );
-                return rgba;
-              });
-          },
-          (exit) => {
-            exit.remove();
-          }
-        );
-    });
+  const disneyGroupedByYear = _.groupBy(disneyData, (d) => {
+    const { Year_Month } = d;
+    const [year, month] = Year_Month.split("-").map((v) => _.toInteger(v));
+    return year;
   });
+  const list = Object.entries(disneyGroupedByYear).map(([year, l]) => ({
+    year: _.toInteger(year),
+    reviews: l.length,
+  }));
+  const maxReviews = d3.max(list, (l) => l.reviews);
+  const minReviews = d3.min(list, (l) => l.reviews);
+
+  svg
+    .selectAll("circle.circleValues")
+    .data(array)
+    .join("circle")
+    .attr("class", "circleValues itemValue")
+    .attr("cx", (a) => x(a.year))
+    .attr("cy", (a) => y(a.birthRate))
+    .attr("r", 8)
+    .style("fill", (a) => {
+      const { year } = a;
+      const array = disneyGroupedByYear[year];
+      if (!array) return "rgba(0, 0, 0, 0)";
+      const value = array.length;
+      const rgba = HSLToRGB(
+        BIRTH_RATE_HSL[0],
+        BIRTH_RATE_HSL[1],
+        75 - 60 * ((value - minReviews + 1) / (maxReviews - minReviews + 1))
+      );
+
+      return rgba;
+    })
+    //   .on("mouseover", (event, a) => handleMouseOver(a))
+    //   .on("mouseleave", (event, a) => handleMouseLeave())
+    .append("title")
+    .text((a) => a.year);
+}
+
+function updateScatterPlot(
+  startYear,
+  finishYear,
+  countries = [],
+  min_polarity = minPolarity,
+  max_polarity = maxPolarity,
+  min_text_length = minTextLength,
+  max_text_length = maxTextLength,
+  _months = months,
+  branches = []
+) {
+  const start = _.toInteger(startYear);
+  const finish = _.toInteger(finishYear);
+
+  const data = disneyData.filter(function (elem) {
+    const { Year_Month, Polarity, Text_length, Reviewer_Location, Branch } =
+      elem;
+    const year = _.toInteger(Year_Month.split("-")[0]);
+    const month = _.toInteger(Year_Month.split("-")[1]);
+    return (
+      start <= year &&
+      year <= finish &&
+      min_polarity <= Polarity &&
+      Polarity <= max_polarity &&
+      min_text_length <= Text_length &&
+      Text_length <= max_text_length &&
+      _months.includes(month) &&
+      (countries.length ? countries.includes(Reviewer_Location) : true) &&
+      (branches.length ? branches.includes(Branch) : true)
+    );
+  });
+
+  const svg = d3.select("#gScatterPlot");
+
+  const minLength = d3.min(data, (d) => parseInt(d.Text_length));
+  const x = d3
+    .scaleLog()
+    .domain([
+      _.max([minLength - 1, 1]),
+      d3.max(data, (d) => parseInt(d.Text_length)),
+    ])
+    .range([0, width]);
+
+  const y = d3.scaleLinear().domain([-1, 1]).range([height, 0]);
+
+  svg
+    .select("#gXAxisScatter")
+    .attr("transform", `translate(0, ${height / 2})`)
+    .call(d3.axisBottom(x));
+
+  svg
+    .selectAll("circle.circleValues")
+    .data(data, (d) => d.Review_ID)
+    .join(
+      (enter) => {
+        circles = enter
+          .append("circle")
+          .attr("class", "circleValues itemValue")
+          .attr("cx", (d) => x(d.Text_length))
+          .attr("cy", (d) => y(d.Polarity))
+          .attr("r", 4)
+          .style("fill", (d) => getSeasonColor(d.season));
+      },
+      (update) => {
+        update
+          .transition()
+          .duration(1000)
+          .attr("cx", (d) => x(d.Text_length))
+          .attr("cy", (d) => y(d.Polarity))
+          .attr("r", 4);
+      },
+      (exit) => {
+        exit.remove();
+      }
+    );
+}
+
+function updateCustomizePlot(
+  _startYear,
+  _finishYear,
+  min_polarity = minPolarity,
+  max_polarity = maxPolarity,
+  min_text_length = minTextLength,
+  max_text_length = maxTextLength,
+  countriesFilter,
+  _months = months,
+  branches = []
+) {
+  const start = _.toInteger(_startYear);
+  const finish = _.toInteger(_finishYear);
+
+  const data = crudeBirthRateFiltered.filter(function (elem) {
+    const year = _.toInteger(elem.Year);
+    return start <= year && year <= finish;
+  });
+
+  const svg = d3.select("#gLineChart");
+
+  const birthRateGroupedByYear = _.groupBy(data, (elem) =>
+    _.toInteger(elem.Year)
+  );
+  const meanBirthRateByYear = {};
+  Object.entries(birthRateGroupedByYear).forEach(([year, list]) => {
+    meanBirthRateByYear[year] =
+      _.sumBy(list, (e) => _.toInteger(e["Birth rate"])) / list.length;
+  });
+
+  const yearsList = _.orderBy(Object.keys(meanBirthRateByYear), (v) =>
+    _.toInteger(v)
+  );
+
+  const array = yearsList.map((year) => ({
+    year: _.toInteger(year),
+    birthRate: meanBirthRateByYear[year],
+  }));
+
+  const x = d3
+    .scalePoint()
+    .domain(array.map((d) => d.year))
+    .range([0, width]);
+
+  svg.select("#gXAxis").call(
+    d3.axisBottom(x).tickFormat((x) => {
+      if (x % 5) return "";
+      return x;
+    })
+  );
+
+  const y = d3
+    .scaleLinear()
+    .domain([
+      0,
+      // d3.min(array, (d) => d.birthRate) - 1,
+      d3.max(array, (d) => d.birthRate) + 1,
+    ])
+    .range([height, 0]);
+  svg.select("#gYAxis").call(d3.axisLeft(y));
+
+  svg
+    .select("path.pathValue")
+    .datum(array)
+    .transition()
+    .duration(1000)
+    .attr(
+      "d",
+      d3
+        .line()
+        .x((d) => x(d.year))
+        .y((d) => y(d.birthRate))
+    );
+  const disneyDataFiltered = disneyData.filter((d) => {
+    const { Polarity, Text_length, Reviewer_Location, Branch } = d;
+    return (
+      min_polarity <= Polarity &&
+      Polarity <= max_polarity &&
+      min_text_length <= Text_length &&
+      Text_length <= max_text_length &&
+      (countriesFilter.length
+        ? countriesFilter.includes(Reviewer_Location)
+        : true) &&
+      (branches.length ? branches.includes(Branch) : true)
+    );
+  });
+  const disneyGroupedByYear = _.groupBy(disneyDataFiltered, (d) => {
+    const { Year_Month } = d;
+    const [year, month] = Year_Month.split("-").map((v) => _.toInteger(v));
+    return year;
+  });
+  const list = Object.entries(disneyGroupedByYear).map(([year, l]) => ({
+    year: _.toInteger(year),
+    reviews: l.length,
+  }));
+  const maxReviews = d3.max(list, (l) => l.reviews);
+  const minReviews = d3.min(list, (l) => l.reviews);
+  svg
+    .selectAll("circle.circleValues")
+    .data(array)
+    .join(
+      (enter) => {
+        const circles = enter
+          .append("circle")
+          .attr("class", "circleValues itemValue")
+          .attr("cx", (a) => x(a.year))
+          .attr("cy", (a) => y(a.birthRate))
+          .attr("r", 8)
+          .style("fill", (a) => {
+            const { year } = a;
+            const array = disneyGroupedByYear[year];
+            if (!array) return "rgba(0, 0, 0, 0)";
+            const value = array.length;
+            const rgba = HSLToRGB(
+              BIRTH_RATE_HSL[0],
+              BIRTH_RATE_HSL[1],
+              75 -
+                60 * ((value - minReviews + 1) / (maxReviews - minReviews + 1))
+            );
+
+            return rgba;
+          });
+        //   .on("mouseover", (event, a) => handleMouseOver(a))
+        //   .on("mouseleave", (event, a) => handleMouseLeave())
+        circles
+          .transition()
+          .duration(1000)
+          .attr("cy", (a) => y(a.birthRate));
+        circles.append("title").text((a) => a.year);
+      },
+      (update) => {
+        update
+          .transition()
+          .duration(1000)
+          .attr("cx", (a) => x(a.year))
+          .attr("cy", (a) => y(a.birthRate))
+          .attr("r", 8)
+          .style("fill", (a) => {
+            const { year } = a;
+            const array = disneyGroupedByYear[year];
+            if (!array) return "rgba(0, 0, 0, 0)";
+            const value = array.length;
+            const rgba = HSLToRGB(
+              BIRTH_RATE_HSL[0],
+              BIRTH_RATE_HSL[1],
+              75 -
+                60 * ((value - minReviews + 1) / (maxReviews - minReviews + 1))
+            );
+            return rgba;
+          });
+      },
+      (exit) => {
+        exit.remove();
+      }
+    );
 }
 
 function drawSlides() {
   function createslider(element) {
     const inputs = element.querySelectorAll("input");
+    const [inputStart, inputEnd] = inputs;
 
     const thumbLeft = element.querySelector(".thumb.left");
     const thumbRight = element.querySelector(".thumb.right");
     const rangeBetween = element.querySelector(".range-between");
     const labelMin = element.querySelector(".range-label-start");
     const labelMax = element.querySelector(".range-label-end");
-
-    const [inputStart, inputEnd] = inputs;
-    const min = parseInt(inputStart.value);
-    const max = parseInt(inputEnd.value);
 
     setStartValueCustomSlider(inputStart, inputEnd, thumbLeft, rangeBetween);
     setEndValueCustomSlider(inputEnd, inputStart, thumbRight, rangeBetween);
@@ -1053,10 +1113,6 @@ function drawSlides() {
       labelMin,
       labelMax,
       rangeBetween
-      // minPolarity,
-      // maxPolarity,
-      // minTextLength,
-      // maxTextLength
     );
   }
 
@@ -1093,10 +1149,9 @@ function drawSlides() {
     thumbRight,
     labelMin,
     labelMax,
-    rangeBetween,
-    rangesValues
+    rangeBetween
   ) {
-    inputStart.addEventListener("input", () => {
+    inputStart.addEventListener("input", async () => {
       setStartValueCustomSlider(inputStart, inputEnd, thumbLeft, rangeBetween);
       setLabelValue(labelMin, inputStart);
       updateCustomizePlot(
@@ -1105,13 +1160,25 @@ function drawSlides() {
         minPolarity,
         maxPolarity,
         minTextLength,
-        maxTextLength
+        maxTextLength,
+        countriesFilter
       );
-      updateScatterPlot(inputStart.value, inputEnd.value);
+      updateScatterPlot(inputStart.value, inputEnd.value, countriesFilter);
+      createChordDiagram(
+        countriesFilter,
+        branchesFilter,
+        inputStart.value,
+        inputEnd.value,
+        minPolarity,
+        maxPolarity,
+        minTextLength,
+        maxTextLength,
+        months
+      );
       sInput = inputStart.value;
     });
 
-    inputEnd.addEventListener("input", () => {
+    inputEnd.addEventListener("input", async () => {
       setEndValueCustomSlider(inputEnd, inputStart, thumbRight, rangeBetween);
       setLabelValue(labelMax, inputEnd);
       updateCustomizePlot(
@@ -1120,9 +1187,21 @@ function drawSlides() {
         minPolarity,
         maxPolarity,
         minTextLength,
-        maxTextLength
+        maxTextLength,
+        countriesFilter
       );
-      updateScatterPlot(inputStart.value, inputEnd.value);
+      updateScatterPlot(inputStart.value, inputEnd.value, countriesFilter);
+      createChordDiagram(
+        countriesFilter,
+        branchesFilter,
+        inputStart.value,
+        inputEnd.value,
+        minPolarity,
+        maxPolarity,
+        minTextLength,
+        maxTextLength,
+        months
+      );
       eInput = inputEnd.value;
     });
 
@@ -1213,4 +1292,58 @@ function HSLToRGB(h, s, l) {
   b = Math.round((b + m) * 255);
 
   return "rgb(" + r + "," + g + "," + b + ")";
+}
+
+function reset() {
+  minPolarity = -1;
+  maxPolarity = 1;
+  minTextLength = 0;
+  maxTextLength = 20756;
+
+  countriesFilter = [];
+  branchesFilter = [];
+
+  months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  selectedSeason = null;
+
+  sInput = 2010;
+  eInput = 2019;
+
+  drawBranchesFilter();
+  drawCountryFilter();
+  createScatterPlotSeasonLabels();
+
+  createChordDiagram(
+    countriesFilter,
+    branchesFilter,
+    sInput,
+    eInput,
+    minPolarity,
+    maxPolarity,
+    minTextLength,
+    maxTextLength,
+    months
+  );
+  updateScatterPlot(
+    sInput,
+    eInput,
+    countriesFilter,
+    minPolarity,
+    maxPolarity,
+    minTextLength,
+    maxTextLength,
+    months,
+    branchesFilter
+  );
+  updateCustomizePlot(
+    sInput,
+    eInput,
+    minPolarity,
+    maxPolarity,
+    minTextLength,
+    maxTextLength,
+    countriesFilter,
+    months,
+    branchesfilter
+  );
 }

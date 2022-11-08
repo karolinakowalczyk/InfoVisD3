@@ -6,48 +6,87 @@
     <script src="script.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <script src="http://d3js.org/topojson.v1.min.js"></script>
   </head>
 
   <body onload="init()">
-    <button onclick="resetBrush()">Clear</button>
-    <div>
-      <div class="range-slider">
-        <div class="range-labels">
-          <span class="range-label range-label-start">1990</span>
-          <span class="range-label range-label-end">2019</span>
-        </div>
-        <input type="range" min="1990" value="1990" max="2018" name="" id="" />
-        <input type="range" min="2010" value="2019" max="2019" name="" id="" />
+    <button onclick="reset()">Clear</button>
 
-        <div class="track-wrapper">
-          <div class="track"></div>
-          <div class="range-between"></div>
-          <div class="thumb left"></div>
-          <div class="thumb right"></div>
+    <div
+      style="
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        width: 100%;
+      "
+    >
+      <div style="flex-basis: auto">
+        <div id="country-filter"></div>
+        <div id="branch-filter"></div>
+      </div>
+      <div style="flex-basis: auto">
+        <div>
+          <div class="range-slider" style="width: 100%">
+            <div class="range-labels">
+              <span class="range-label range-label-start">2010</span>
+              <span class="range-label range-label-end">2019</span>
+            </div>
+            <input
+              type="range"
+              min="2010"
+              value="2010"
+              max="2019"
+              name=""
+              id="start-year-input"
+            />
+            <input
+              type="range"
+              min="2010"
+              value="2019"
+              max="2019"
+              name=""
+              id="end-year-input"
+            />
+
+            <div class="track-wrapper">
+              <div class="track"></div>
+              <div class="range-between"></div>
+              <div class="thumb left"></div>
+              <div class="thumb right"></div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top: 40px">
+          <div><svg id="chord"></svg></div>
+          <!-- <div id="div-chord"></div> -->
         </div>
       </div>
+
+      <div style="flex-basis: auto">
+        <div
+          style="display: flex; flex-direction: row; justify-content: center"
+          id="div-season_labels"
+        >
+          <div id="season_label-spring" class="season_label">
+            <div style="background: rgba(0, 255, 0, 1)"></div>
+            <p>spring</p>
+          </div>
+          <div id="season_label-summer" class="season_label">
+            <div style="background: rgba(255, 215, 0, 1)"></div>
+            <p>summer</p>
+          </div>
+          <div id="season_label-autumn" class="season_label">
+            <div style="background: rgba(55, 27, 7, 1)"></div>
+            <p>autumn</p>
+          </div>
+          <div id="season_label-winter" class="season_label">
+            <div style="background: rgba(135, 206, 250, 1)"></div>
+            <p>winter</p>
+          </div>
+        </div>
+        <div><svg id="scatter"></svg></div>
+        <div><svg id="line"></svg></div>
+      </div>
     </div>
-    <div style="margin-top: 50px; display: flex; flex-direction: row">
-      <div style="width: 50%; float: left">
-        <div><svg id="vi1"></svg></div>
-        <div id="div-vi1"></div>
-      </div>
-      <div
-        style="width: 50%; float: left; display: flex; flex-direction: column"
-      >
-        <div><svg id="vi2"></svg></div>
-        <div><svg id="vi3"></svg></div>
-      </div>
-    </div>
-    <!-- <div style="margin-top: 50px; display: flex; flex-direction: row">
-      <div style="width: 50%; float: left"></div>
-      <div
-        style="width: 50%; float: left; display: flex; flex-direction: column"
-      >
-        <div style="height: 40px"><svg id="seasons-labels"></svg></div>
-        <div><svg id="vi2"></svg></div>
-        <div><svg id="vi3"></svg></div>
-      </div>
-    </div> -->
   </body>
 </html>
