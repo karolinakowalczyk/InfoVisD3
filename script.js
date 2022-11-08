@@ -7,14 +7,14 @@ const CHORD_HSL = [39, 100];
 const INIT_START_YEAR_CUSTOMIZED_PLOT = 2010;
 const COUNTRY_SELECTOR_BG = "rgba(100, 100, 0, 0.5)";
 
-const DISNEDY_BRANCHES = [
-  "Disneyland_Paris",
-  "Disneyland_HongKong",
-  "Disneyland_California",
-];
+const PARIS_BRANCH = "Disneyland_Paris";
+const HONG_KONG_BRANCH = "Disneyland_HongKong";
+const CALIFORNIA_BRANCH = "Disneyland_California";
+
+const DISNEDY_BRANCHES = [PARIS_BRANCH, HONG_KONG_BRANCH, CALIFORNIA_BRANCH];
 
 const DISNEY_COLORS = {
-  Disneyland_Paris: "blue",
+  Disneyland_Paris: "gold",
   Disneyland_HongKong: "red",
   Disneyland_California: "green",
 };
@@ -35,6 +35,9 @@ const margin = {
 const width = 600 - margin.left - margin.right;
 const height = 400 - margin.top - margin.bottom;
 
+let yearSpanBirthRate = 18;
+
+let branchWise = false;
 let minPolarity = -1;
 let maxPolarity = 1;
 let minTextLength = 0;
@@ -157,6 +160,7 @@ const drawCountryFilter = () => {
         minTextLength,
         maxTextLength,
         countriesFilter,
+        months,
         branchesFilter
       );
       updateScatterPlot(
@@ -240,6 +244,7 @@ const drawBranchesFilter = () => {
         minTextLength,
         maxTextLength,
         countriesFilter,
+        months,
         branchesFilter
       );
       updateScatterPlot(
@@ -350,6 +355,17 @@ function createScatterPlot() {
     //   ", " +
     //   right_bottom +
     //   " )";
+    createChordDiagram(
+      countriesFilter,
+      branchesFilter,
+      sInput,
+      eInput,
+      minPolarity,
+      maxPolarity,
+      minTextLength,
+      maxTextLength,
+      months
+    );
 
     updateCustomizePlot(
       sInput,
@@ -377,6 +393,17 @@ function createScatterPlot() {
       maxPolarity = 1;
       minTextLength = 0;
       maxTextLength = 20756;
+      createChordDiagram(
+        countriesFilter,
+        branchesFilter,
+        sInput,
+        eInput,
+        minPolarity,
+        maxPolarity,
+        minTextLength,
+        maxTextLength,
+        months
+      );
       updateCustomizePlot(
         sInput,
         eInput,
@@ -487,15 +514,28 @@ function chordPlot(matrix, tags) {
     .enter()
     .append("g");
 
+  const maxReviews = d3.max(matrix.flat(), (v) => v);
+  const minReviews = d3.min(matrix.flat(), (v) => v);
+
   group
     .append("path")
-    .style("fill", function (d) {
-      return "gold";
-      // return color(d.index);
+    .style("fill", function (obj) {
+      const { value } = obj;
+      const rgba = HSLToRGB(
+        DENSITY_OF_REVIEWERS_HSL[0],
+        DENSITY_OF_REVIEWERS_HSL[1],
+        80 - 50 * ((value - minReviews + 1) / (maxReviews - minReviews + 1))
+      );
+      return rgba;
     })
-    .style("stroke", function (d) {
-      return "gold";
-      // return d3.rgb(color(d.index)).darker();
+    .style("stroke", function (obj) {
+      const { value } = obj;
+      const rgba = HSLToRGB(
+        DENSITY_OF_REVIEWERS_HSL[0],
+        DENSITY_OF_REVIEWERS_HSL[1],
+        80 - 50 * ((value - minReviews + 1) / (maxReviews - minReviews + 1))
+      );
+      return rgba;
     })
     .attr("id", function (d, i) {
       return "group" + d.index;
@@ -565,6 +605,8 @@ function chordPlot(matrix, tags) {
       return tags[d.index];
     });
 
+  const sourceTarget = branchWise ? "source" : "target";
+
   const ribbons = g
     .append("g")
     .attr("class", "ribbons")
@@ -576,10 +618,10 @@ function chordPlot(matrix, tags) {
     .append("path")
     .attr("d", ribbon)
     .style("fill", function (d) {
-      return DISNEY_COLORS[tags[d.target.index]];
+      return DISNEY_COLORS[tags[d[sourceTarget].index]];
     })
     .style("stroke", function (d) {
-      return d3.rgb(DISNEY_COLORS[tags[d.target.index]]).darker();
+      return d3.rgb(DISNEY_COLORS[tags[d[sourceTarget].index]]).darker();
     });
 
   ribbons.append("title").text(function (d) {
@@ -628,6 +670,7 @@ function chordPlot(matrix, tags) {
         minTextLength,
         maxTextLength,
         countriesList,
+        months,
         branches
       );
 
@@ -644,24 +687,14 @@ function chordPlot(matrix, tags) {
 
   function chordTip(d) {
     const j = d3.formatPrefix(",.0", 1e1);
-    return (
-      "Aantal boeken met genres:\n" +
-      genres[d.target.index] +
-      " en " +
-      genres[d.source.index] +
-      ": " +
-      j(d.source.value)
-    );
+    return `${genres[d.target.index]} reviewed by ${j(
+      d.source.value
+    )} visitors from ${genres[d.source.index]}`;
   }
 
   function groupTip(d) {
     const j = d3.formatPrefix(",.0", 1e1);
-    return (
-      "Totaal aantal boeken met het genre " +
-      genres[d.index] +
-      ":\n" +
-      j(d.value)
-    );
+    return "Reviewers from " + genres[d.index] + ":\n" + j(d.value);
   }
 }
 
@@ -697,7 +730,6 @@ function createChordDiagram(
       );
     }
   );
-  console.log("data", data);
   const obj = {}; // {source: {target: value}}
 
   data.forEach(({ Branch, Reviewer_Location }) => {
@@ -706,21 +738,40 @@ function createChordDiagram(
       obj[Branch][Reviewer_Location] = 0;
     obj[Branch][Reviewer_Location]++;
   });
-  "obj", obj;
   const array = [];
   Object.entries(obj).forEach(([branch, branchObj]) => {
     Object.entries(branchObj).forEach(([originCountry, value]) => {
-      array.push({ source: branch, target: originCountry, value: 1 });
-      array.push({ source: originCountry, target: branch, value });
+      if (branchWise)
+        array.push({ source: branch, target: originCountry, value });
+      else array.push({ source: originCountry, target: branch, value });
     });
   });
-  const names = data
+  let names = data
     .map(({ Branch, Reviewer_Location }) => [Branch, Reviewer_Location])
     .flatMap((num) => num)
     .filter((value, index, self) => self.indexOf(value) === index);
 
-  "names", names;
-  const color = d3.scaleOrdinal(names, d3.schemeCategory10);
+  const hk = _.indexOf(names, HONG_KONG_BRANCH);
+  if (hk !== -1) {
+    if (hk !== 0) {
+      _.remove(names, (n) => n === HONG_KONG_BRANCH);
+      names.unshift(HONG_KONG_BRANCH);
+    }
+  }
+  const paris = _.indexOf(names, PARIS_BRANCH);
+  if (paris !== -1) {
+    if (paris !== 0) {
+      _.remove(names, (n) => n === PARIS_BRANCH);
+      names.unshift(PARIS_BRANCH);
+    }
+  }
+  const cal = _.indexOf(names, CALIFORNIA_BRANCH);
+  if (cal !== -1) {
+    if (cal !== 0) {
+      _.remove(names, (n) => n === CALIFORNIA_BRANCH);
+      names.unshift(CALIFORNIA_BRANCH);
+    }
+  }
 
   const index = new Map(names.map((name, i) => [name, i]));
   const matrix = Array.from(index, () => new Array(names.length).fill(0));
@@ -728,7 +779,6 @@ function createChordDiagram(
     matrix[index.get(source)][index.get(target)] += value;
     // matrix[index.get(target)][index.get(source)] += value;
   }
-
   chordPlot(matrix, names);
   return;
 }
@@ -760,7 +810,10 @@ function createCustomizePlot() {
     .text("year");
 
   const data = crudeBirthRateFiltered.filter(function (elem) {
-    return INIT_START_YEAR_CUSTOMIZED_PLOT <= elem.Year && elem.Year <= 2019;
+    return (
+      INIT_START_YEAR_CUSTOMIZED_PLOT - yearSpanBirthRate <= elem.Year &&
+      elem.Year <= 2019
+    );
   });
   const birthRateGroupedByYear = _.groupBy(data, (elem) =>
     _.toInteger(elem.Year)
@@ -947,10 +1000,14 @@ function updateCustomizePlot(
 ) {
   const start = _.toInteger(_startYear);
   const finish = _.toInteger(_finishYear);
-
   const data = crudeBirthRateFiltered.filter(function (elem) {
-    const year = _.toInteger(elem.Year);
-    return start <= year && year <= finish;
+    const { Entity, Year } = elem;
+    const year = _.toInteger(Year);
+    return (
+      start - yearSpanBirthRate <= year &&
+      year <= finish &&
+      (countriesFilter.length ? countriesFilter.includes(Entity) : true)
+    );
   });
 
   const svg = d3.select("#gLineChart");
@@ -1007,9 +1064,16 @@ function updateCustomizePlot(
         .x((d) => x(d.year))
         .y((d) => y(d.birthRate))
     );
+
   const disneyDataFiltered = disneyData.filter((d) => {
-    const { Polarity, Text_length, Reviewer_Location, Branch } = d;
+    const { Polarity, Text_length, Reviewer_Location, Branch, Year_Month } = d;
+    const year = _.toInteger(Year_Month.split("-")[0]);
+    const month = _.toInteger(Year_Month.split("-")[1]);
+
     return (
+      start <= year &&
+      year <= finish &&
+      _months.includes(month) &&
       min_polarity <= Polarity &&
       Polarity <= max_polarity &&
       min_text_length <= Text_length &&
@@ -1020,6 +1084,7 @@ function updateCustomizePlot(
       (branches.length ? branches.includes(Branch) : true)
     );
   });
+
   const disneyGroupedByYear = _.groupBy(disneyDataFiltered, (d) => {
     const { Year_Month } = d;
     const [year, month] = Year_Month.split("-").map((v) => _.toInteger(v));
@@ -1344,6 +1409,6 @@ function reset() {
     maxTextLength,
     countriesFilter,
     months,
-    branchesfilter
+    branchesFilter
   );
 }
