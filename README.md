@@ -15,3 +15,11 @@ git clone https://github.com/karolinakowalczyk/InfoVisD3.git
 
 ## Reccomended browser
 Google Chrome version 107.0.5304.88
+
+## App Interface
+![screen-1](https://github.com/karolinakowalczyk/InfoVisD3/assets/47788618/485e70c7-fd70-4d6f-b80f-db3331cc8ba9)
+
+![screen-2](https://github.com/karolinakowalczyk/InfoVisD3/assets/47788618/1375ecea-1875-4343-a9a6-89db97984f4d)
+
+
+![screen-3](https://github.com/karolinakowalczyk/InfoVisD3/assets/47788618/0f1a4382-f1c0-4f60-bab0-d0077ff51a11)
